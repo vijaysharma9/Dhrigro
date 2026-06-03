@@ -1,0 +1,35 @@
+# Environment
+.env
+.env.local
+.env.development
+.env.staging
+.env.production
+backend/.env
+apps/daily_rashan/.env
+*.pem
+
+# Node
+node_modules/
+dist/
+coverage/
+
+# Flutter
+apps/daily_rashan/.dart_tool/
+apps/daily_rashan/build/
+apps/daily_rashan/.flutter-plugins-dependencies
+apps/daily_rashan/ios/Pods/
+apps/daily_rashan/android/.gradle/
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# OS
+.DS_Store
+
+# Prisma
+backend/prisma/migrations/**/migration_lock.toml
+
+# Logs
+*.log
