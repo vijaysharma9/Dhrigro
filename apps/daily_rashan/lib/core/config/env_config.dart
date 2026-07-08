@@ -27,13 +27,30 @@ class EnvConfig {
 
     for (final file in candidates) {
       try {
-        await dotenv.load(fileName: file);
-        return;
+        await dotenv.load(fileName: file, isOptional: true);
+        if (dotenv.env.isNotEmpty) return;
       } catch (_) {
         continue;
       }
     }
+
+    dotenv.testLoad(mergeWith: _compileTimeDefaults);
   }
+
+  static Map<String, String> get _compileTimeDefaults => {
+        'API_BASE_URL': const String.fromEnvironment(
+          'API_BASE_URL',
+          defaultValue: 'http://localhost:3000/api/v1',
+        ),
+        'APP_NAME': const String.fromEnvironment('APP_NAME', defaultValue: 'Dhrigro'),
+        'RAZORPAY_KEY_ID': const String.fromEnvironment('RAZORPAY_KEY_ID'),
+        'FIREBASE_API_KEY': const String.fromEnvironment('FIREBASE_API_KEY'),
+        'FIREBASE_APP_ID': const String.fromEnvironment('FIREBASE_APP_ID'),
+        'FIREBASE_PROJECT_ID': const String.fromEnvironment('FIREBASE_PROJECT_ID'),
+        'FIREBASE_MESSAGING_SENDER_ID':
+            const String.fromEnvironment('FIREBASE_MESSAGING_SENDER_ID'),
+        'ENABLE_API_LOGGING': kReleaseMode ? 'false' : 'true',
+      };
 
   static void validate() {
     if (apiBaseUrl.isEmpty) {

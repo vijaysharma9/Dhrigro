@@ -1,5 +1,5 @@
 import 'package:dio/dio.dart';
-import 'env_config.dart';
+import '../config/env_config.dart';
 
 class ApiException implements Exception {
   ApiException(this.message, {this.statusCode, this.code});
