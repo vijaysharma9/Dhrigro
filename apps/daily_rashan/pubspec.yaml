@@ -1,5 +1,5 @@
-name: daily_rashan
-description: Daily Rashan - Grocery & Ration Delivery Platform
+name: dhrigro
+description: Dhrigro - Everything Your Kitchen Needs.
 publish_to: 'none'
 version: 1.0.0+1
 
@@ -54,11 +54,15 @@ dependencies:
   # Upload
   image_picker: ^1.1.2
   file_picker: ^8.3.7
+  excel: ^4.0.6
   mime: ^2.0.0
   fl_chart: ^0.70.2
+  socket_io_client: ^3.1.5
 
 dev_dependencies:
   flutter_test:
+    sdk: flutter
+  integration_test:
     sdk: flutter
   flutter_lints: ^5.0.0
   build_runner: ^2.4.15
@@ -71,3 +75,4 @@ flutter:
   assets:
     - assets/images/
     - .env
+    - .env.development

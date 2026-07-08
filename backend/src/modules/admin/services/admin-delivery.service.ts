@@ -23,6 +23,7 @@ export class AdminDeliveryService {
   async listAllSlots() {
     return this.prisma.deliverySlot.findMany({
       orderBy: [{ deliveryType: 'asc' }, { startTime: 'asc' }],
+      include: { _count: { select: { orders: true } } },
     });
   }
 

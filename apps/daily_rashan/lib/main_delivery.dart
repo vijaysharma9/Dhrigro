@@ -19,7 +19,7 @@ class DeliveryApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Daily Rashan Delivery',
+      title: 'Dhrigro Delivery',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       home: const DeliveryAuthGate(),

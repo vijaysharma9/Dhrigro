@@ -49,7 +49,7 @@ API: `http://localhost:3000/api/v1`
 Swagger: `http://localhost:3000/docs`
 
 **Default admin (after seed):**
-- Email: `admin@dailyrashan.com`
+- Email: `admin@dhrigro.com`
 - Password: `Admin@123456`
 - Phone: `9999999999`
 

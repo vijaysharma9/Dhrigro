@@ -19,7 +19,8 @@ export type AdminPermission =
   | 'coupons'
   | 'banners'
   | 'delivery'
-  | 'reports';
+  | 'reports'
+  | 'system';
 
 export const ROLE_PERMISSIONS: Record<UserRole, AdminPermission[] | '*'> = {
   [UserRole.SUPER_ADMIN]: '*',
@@ -28,6 +29,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, AdminPermission[] | '*'> = {
     'orders',
     'delivery',
     'reports',
+    'system',
   ],
   [UserRole.INVENTORY_MANAGER]: [
     'dashboard',

@@ -6,6 +6,7 @@ import { AdminUsersService } from './services/admin-users.service';
 import { AdminInventoryService } from './services/admin-inventory.service';
 import { AdminReportsService } from './services/admin-reports.service';
 import { AdminDeliveryService } from './services/admin-delivery.service';
+import { AdminSystemService } from './services/admin-system.service';
 import { OrdersModule } from '../orders/orders.module';
 import { CouponsModule } from '../coupons/coupons.module';
 import { BannersModule } from '../banners/banners.module';
@@ -28,6 +29,7 @@ import { DeliveryAssignmentsModule } from '../delivery-assignments/delivery-assi
     AdminInventoryService,
     AdminReportsService,
     AdminDeliveryService,
+    AdminSystemService,
   ],
   exports: [AdminService],
 })

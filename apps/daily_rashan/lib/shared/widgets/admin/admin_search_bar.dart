@@ -8,16 +8,19 @@ class AdminSearchBar extends StatelessWidget {
     required this.onChanged,
     this.onSubmitted,
     this.debounceHint,
+    this.focusNode,
   });
 
   final String hint;
   final ValueChanged<String> onChanged;
   final VoidCallback? onSubmitted;
   final String? debounceHint;
+  final FocusNode? focusNode;
 
   @override
   Widget build(BuildContext context) {
     return TextField(
+      focusNode: focusNode,
       decoration: InputDecoration(
         hintText: hint,
         prefixIcon: const Icon(Icons.search, color: AppColors.textGrey),

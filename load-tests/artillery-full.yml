@@ -1,0 +1,47 @@
+config:
+  target: "{{ $processEnvironment.API_URL || 'http://localhost:3000' }}"
+  phases:
+    - duration: 120
+      arrivalRate: 10
+      name: Warm up
+    - duration: 300
+      arrivalRate: 50
+      name: Sustained load
+    - duration: 60
+      arrivalRate: 100
+      name: Peak burst
+  defaults:
+    headers:
+      Content-Type: application/json
+
+scenarios:
+  health:
+    flow:
+      - get:
+          url: /health
+          expect:
+            - statusCode: 200
+
+  home_browse:
+    weight: 5
+    flow:
+      - get:
+          url: /api/v1/home
+          expect:
+            - statusCode: 200
+
+  product_search:
+    weight: 3
+    flow:
+      - get:
+          url: /api/v1/products?search=milk&limit=20
+          expect:
+            - statusCode: 200
+
+  metrics:
+    weight: 1
+    flow:
+      - get:
+          url: /metrics
+          expect:
+            - statusCode: 200

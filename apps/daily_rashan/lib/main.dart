@@ -34,19 +34,19 @@ class _AppBootstrapState extends ConsumerState<_AppBootstrap> {
 
   @override
   Widget build(BuildContext context) {
-    return const DailyRashanApp();
+    return const DhrigroApp();
   }
 }
 
-class DailyRashanApp extends ConsumerWidget {
-  const DailyRashanApp({super.key});
+class DhrigroApp extends ConsumerWidget {
+  const DhrigroApp({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(routerProvider);
 
     return MaterialApp.router(
-      title: 'Daily Rashan',
+      title: 'Dhrigro',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       routerConfig: router,

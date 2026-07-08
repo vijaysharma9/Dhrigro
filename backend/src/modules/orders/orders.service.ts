@@ -19,6 +19,9 @@ import {
   paginatedResponse,
   PaginationDto,
 } from '../../common/dto/pagination.dto';
+import { SocketRealtimeService } from '../../common/realtime/socket-realtime.service';
+import { REALTIME_ROOMS } from '../../common/realtime/realtime-events';
+import { AutomationService } from '../../common/automation/automation.service';
 
 @Injectable()
 export class OrdersService {
@@ -27,6 +30,8 @@ export class OrdersService {
     private cartService: CartService,
     private deliveryService: DeliveryService,
     private notificationsService: NotificationsService,
+    private realtime: SocketRealtimeService,
+    private automation: AutomationService,
   ) {}
 
   async placeOrder(
@@ -145,6 +150,13 @@ export class OrdersService {
       OrderStatus.PENDING,
     );
 
+    await this.realtime.publish({
+      type: 'order_created',
+      room: REALTIME_ROOMS.admin,
+      payload: { orderId: order.id, orderNumber, userId },
+    });
+    await this.automation.onOrderCreated(order.id, userId);
+
     return {
       ...order,
       totalAmount,
@@ -234,6 +246,12 @@ export class OrdersService {
       order.orderNumber,
       status,
     );
+
+    await this.realtime.publish({
+      type: 'order_updated',
+      room: REALTIME_ROOMS.admin,
+      payload: { orderId, status, orderNumber: order.orderNumber },
+    });
 
     return updated;
   }

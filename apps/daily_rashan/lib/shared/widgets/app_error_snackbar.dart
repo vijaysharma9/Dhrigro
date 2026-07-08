@@ -3,9 +3,7 @@ import '../../core/constants/app_colors.dart';
 import '../../core/network/api_exception.dart';
 
 void showAppErrorSnackBar(BuildContext context, Object error) {
-  final message = error is ApiException
-      ? error.message
-      : 'Something went wrong. Please try again.';
+  final message = ApiException.friendlyMessage(error);
   ScaffoldMessenger.of(context).showSnackBar(
     SnackBar(
       content: Text(message),

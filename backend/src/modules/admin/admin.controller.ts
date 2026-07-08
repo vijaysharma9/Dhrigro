@@ -21,6 +21,9 @@ import { AdminUsersService } from './services/admin-users.service';
 import { AdminInventoryService } from './services/admin-inventory.service';
 import { AdminReportsService } from './services/admin-reports.service';
 import { AdminDeliveryService } from './services/admin-delivery.service';
+import { AdminSystemService } from './services/admin-system.service';
+import { AuditService } from '../../common/audit/audit.service';
+import { AutomationService } from '../../common/automation/automation.service';
 import { DeliveryAssignmentsService } from '../delivery-assignments/delivery-assignments.service';
 import {
   AssignDeliveryDto,
@@ -57,6 +60,9 @@ export class AdminController {
     private deliveryAssignmentsService: DeliveryAssignmentsService,
     private couponsService: CouponsService,
     private bannersService: BannersService,
+    private adminSystemService: AdminSystemService,
+    private auditService: AuditService,
+    private automationService: AutomationService,
   ) {}
 
   @AdminAccess('dashboard')
@@ -69,6 +75,46 @@ export class AdminController {
   @Get('permissions')
   getPermissions() {
     return { staffRoles: STAFF_ROLES };
+  }
+
+  // --- System / observability ---
+  @AdminAccess('system')
+  @Get('system/health')
+  getSystemHealth() {
+    return this.adminSystemService.getSystemHealth();
+  }
+
+  @AdminAccess('system')
+  @Get('system/bi')
+  getBiMetrics(@Query() query: AdminReportsQueryDto) {
+    return this.adminSystemService.getBiMetrics(query.fromDate, query.toDate);
+  }
+
+  @AdminAccess('system')
+  @Get('audit-logs')
+  listAuditLogs(
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+    @Query('resource') resource?: string,
+  ) {
+    return this.auditService.list({ page, limit, resource });
+  }
+
+  @AdminAccess('system')
+  @Get('automation/rules')
+  getAutomationRules() {
+    return this.automationService.getRules();
+  }
+
+  @AdminAccess('system')
+  @Patch('automation/rules/:id')
+  updateAutomationRule(
+    @Param('id') id: string,
+    @Body() body: { enabled: boolean },
+  ) {
+    const rule = this.automationService.updateRule(id, body.enabled);
+    if (!rule) return { error: 'Rule not found' };
+    return rule;
   }
 
   // --- Orders ---
@@ -343,6 +389,12 @@ export class AdminController {
   @Get('reports/top-products')
   topProductsReport(@Query() query: AdminReportsQueryDto) {
     return this.adminReportsService.topProductsReport(query);
+  }
+
+  @AdminAccess('reports')
+  @Get('reports/categories')
+  categoriesReport(@Query() query: AdminReportsQueryDto) {
+    return this.adminReportsService.categoriesReport(query);
   }
 
   @AdminAccess('reports')

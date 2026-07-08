@@ -1,7 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/home_repository.dart';
 
-final homeDataProvider = FutureProvider<Map<String, dynamic>>((ref) async {
+final homeDataProvider =
+    FutureProvider.autoDispose<Map<String, dynamic>>((ref) async {
   return ref.read(homeRepositoryProvider).getHomeData();
 });
 

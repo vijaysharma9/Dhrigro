@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/network/dio_client.dart';
+import '../../../../shared/widgets/empty_state_widget.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import 'delivery_home_screen.dart';
 
@@ -16,7 +17,15 @@ class DeliveryAuthGate extends ConsumerWidget {
       loading: () => const Scaffold(
         body: Center(child: CircularProgressIndicator()),
       ),
-      error: (e, _) => Center(child: Text('$e')),
+      error: (e, _) => Scaffold(
+        body: EmptyStateWidget(
+          icon: Icons.wifi_off,
+          title: 'Could not verify session',
+          subtitle: 'Check your connection and try again',
+          actionLabel: 'Retry',
+          onAction: () => ref.invalidate(authStateProvider),
+        ),
+      ),
       data: (user) {
         if (user == null) return const _DeliveryLoginScreen();
         if (user.role != 'DELIVERY_PARTNER') {
@@ -52,7 +61,7 @@ class _DeliveryLoginScreen extends ConsumerStatefulWidget {
 }
 
 class _DeliveryLoginScreenState extends ConsumerState<_DeliveryLoginScreen> {
-  final _phone = TextEditingController(text: '8888888888');
+  final _phone = TextEditingController();
   final _password = TextEditingController();
   bool _loading = false;
 

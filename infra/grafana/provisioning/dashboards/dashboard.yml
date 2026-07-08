@@ -1,0 +1,10 @@
+apiVersion: 1
+
+providers:
+  - name: Daily Rashan
+    orgId: 1
+    folder: Daily Rashan
+    type: file
+    disableDeletion: false
+    options:
+      path: /var/lib/grafana/dashboards

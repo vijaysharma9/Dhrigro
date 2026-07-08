@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:daily_rashan/shared/widgets/shimmer_box.dart';
+import 'package:dhrigro/shared/widgets/shimmer_box.dart';
 
 void main() {
   testWidgets('ShimmerBox renders', (tester) async {

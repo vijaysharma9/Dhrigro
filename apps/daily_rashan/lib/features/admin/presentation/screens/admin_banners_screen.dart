@@ -4,9 +4,11 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
+import '../../../../core/admin/admin_api_utils.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../upload/data/upload_repository.dart';
 import '../../../upload/presentation/providers/upload_provider.dart';
+import '../../../../shared/widgets/admin/admin_state_widgets.dart';
 import '../../data/admin_repository.dart';
 
 final adminBannersProvider = FutureProvider.autoDispose<List<dynamic>>((ref) {
@@ -85,7 +87,7 @@ class _AdminBannersScreenState extends ConsumerState<AdminBannersScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed: $e')),
+          SnackBar(content: Text(AdminApiUtils.dioMessage(e))),
         );
       }
     }
@@ -135,7 +137,11 @@ class _AdminBannersScreenState extends ConsumerState<AdminBannersScreen> {
         const SizedBox(height: 12),
         bannersAsync.when(
           loading: () => const CircularProgressIndicator(),
-          error: (e, _) => Text('$e'),
+          error: (e, _) => AdminErrorState(
+            error: e,
+            title: 'Could not load banners',
+            onRetry: () => ref.invalidate(adminBannersProvider),
+          ),
           data: (banners) {
             if (banners.isEmpty) return const Text('No banners');
             return Column(

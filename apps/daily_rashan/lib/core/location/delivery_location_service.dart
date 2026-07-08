@@ -10,6 +10,9 @@ abstract class DeliveryLocationService {
 
 class NoopDeliveryLocationService implements DeliveryLocationService {
   @override
+  bool get isLiveTrackingEnabled => false;
+
+  @override
   Future<void> reportPosition({
     required double latitude,
     required double longitude,

@@ -69,7 +69,7 @@ class RazorpayCheckoutService {
       'key': keyId,
       'amount': amount,
       'currency': checkoutData['currency'] ?? 'INR',
-      'name': 'Daily Rashan',
+      'name': 'Dhrigro',
       'description': 'Order ${checkoutData['orderNumber'] ?? ''}',
       'order_id': razorpayOrderId,
       'prefill': {
@@ -97,8 +97,12 @@ class RazorpayCheckoutService {
 
   void _handleError(PaymentFailureResponse response) {
     final orderId = _pendingOrderId;
+    final errorMap = response.error;
+    final errorDescription = errorMap is Map
+        ? errorMap['description']?.toString()
+        : null;
     final message =
-        response.message ?? response.error?.description ?? 'Payment failed';
+        response.message ?? errorDescription ?? 'Payment failed';
 
     if (orderId != null) {
       _repository.reportPaymentFailed(orderId, reason: message).catchError((_) {});

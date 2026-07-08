@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../shared/widgets/empty_state_widget.dart';
 import '../providers/delivery_providers.dart';
 import 'delivery_order_detail_screen.dart';
 
@@ -13,7 +14,13 @@ class DeliveryOrdersScreen extends ConsumerWidget {
 
     return assignedAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Center(child: Text('$e')),
+      error: (e, _) => EmptyStateWidget(
+        icon: Icons.local_shipping_outlined,
+        title: 'Could not load orders',
+        subtitle: 'Check your connection and try again',
+        actionLabel: 'Retry',
+        onAction: () => ref.invalidate(deliveryAssignedProvider),
+      ),
       data: (res) {
         final list = (res['data'] as List? ?? []).cast<Map<String, dynamic>>();
         if (list.isEmpty) {

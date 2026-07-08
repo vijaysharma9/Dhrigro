@@ -1,14 +1,23 @@
 import {
   IsArray,
   IsBoolean,
+  IsInt,
   IsNotEmpty,
   IsNumber,
   IsOptional,
   IsString,
   IsUUID,
+  Max,
   Min,
 } from 'class-validator';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
+
+function toOptionalBoolean(value: unknown): boolean | undefined {
+  if (value === undefined || value === null || value === '') return undefined;
+  if (value === true || value === 'true') return true;
+  if (value === false || value === 'false') return false;
+  return undefined;
+}
 
 export class CreateProductVariantDto {
   @IsNotEmpty()
@@ -37,6 +46,10 @@ export class CreateProductDto {
 
   @IsUUID()
   categoryId: string;
+
+  @IsOptional()
+  @IsUUID()
+  subcategoryId?: string;
 
   @IsOptional()
   description?: string;
@@ -92,6 +105,9 @@ export class UpdateProductDto {
   categoryId?: string;
 
   @IsOptional()
+  subcategoryId?: string | null;
+
+  @IsOptional()
   description?: string;
 
   @IsOptional()
@@ -128,9 +144,134 @@ export class UpdateProductDto {
   tags?: string[];
 }
 
+/** Combined public list query — single DTO avoids ValidationPipe conflicts. */
+export class ProductsQueryDto {
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number = 1;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  limit?: number = 20;
+
+  @IsOptional()
+  @IsString()
+  search?: string;
+
+  @IsOptional()
+  @IsString()
+  sortBy?: string;
+
+  @IsOptional()
+  @IsString()
+  sortOrder?: 'asc' | 'desc';
+
+  @IsOptional()
+  @IsString()
+  categoryId?: string;
+
+  @IsOptional()
+  @IsString()
+  subcategoryId?: string;
+
+  @IsOptional()
+  @Transform(({ value }) => toOptionalBoolean(value))
+  @IsBoolean()
+  isFeatured?: boolean;
+
+  @IsOptional()
+  @Transform(({ value }) => toOptionalBoolean(value))
+  @IsBoolean()
+  isBestSeller?: boolean;
+
+  @IsOptional()
+  @Transform(({ value }) => toOptionalBoolean(value))
+  @IsBoolean()
+  isTrending?: boolean;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  minPrice?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  maxPrice?: number;
+}
+
+/** Combined admin list query — single DTO avoids ValidationPipe conflicts with PaginationDto. */
+export class AdminProductsQueryDto {
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number = 1;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  limit?: number = 20;
+
+  @IsOptional()
+  @IsString()
+  search?: string;
+
+  @IsOptional()
+  @IsString()
+  sortBy?: string;
+
+  @IsOptional()
+  @IsString()
+  sortOrder?: 'asc' | 'desc';
+
+  @IsOptional()
+  @IsUUID()
+  categoryId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  subcategoryId?: string;
+
+  @IsOptional()
+  @Transform(({ value }) => toOptionalBoolean(value))
+  @IsBoolean()
+  isFeatured?: boolean;
+
+  @IsOptional()
+  @Transform(({ value }) => toOptionalBoolean(value))
+  @IsBoolean()
+  isBestSeller?: boolean;
+
+  @IsOptional()
+  @Transform(({ value }) => toOptionalBoolean(value))
+  @IsBoolean()
+  isTrending?: boolean;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  minPrice?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  maxPrice?: number;
+}
+
 export class ProductFilterDto {
   @IsOptional()
   categoryId?: string;
+
+  @IsOptional()
+  subcategoryId?: string;
 
   @IsOptional()
   search?: string;

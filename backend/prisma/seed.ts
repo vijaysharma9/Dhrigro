@@ -1,12 +1,13 @@
 import { PrismaClient, UserRole, DeliveryType } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
+import { syncCategories } from './category-sync';
 
 const prisma = new PrismaClient();
 
 async function main() {
   console.log('🌱 Seeding database...');
 
-  const adminEmail = process.env.ADMIN_SEED_EMAIL || 'admin@dailyrashan.com';
+  const adminEmail = process.env.ADMIN_SEED_EMAIL || 'admin@dhrigro.com';
   const adminPassword = process.env.ADMIN_SEED_PASSWORD || 'Admin@123456';
   const adminPhone = process.env.ADMIN_SEED_PHONE || '9999999999';
 
@@ -73,36 +74,15 @@ async function main() {
     });
   }
 
-  const categories = [
-    { name: 'Fruits & Vegetables', slug: 'fruits-vegetables', sortOrder: 1 },
-    { name: 'Dairy & Breakfast', slug: 'dairy-breakfast', sortOrder: 2 },
-    { name: 'Snacks & Beverages', slug: 'snacks-beverages', sortOrder: 3 },
-    { name: 'Staples & Grains', slug: 'staples-grains', sortOrder: 4 },
-    { name: 'Personal Care', slug: 'personal-care', sortOrder: 5 },
-    { name: 'Household', slug: 'household', sortOrder: 6 },
-  ];
-
-  const categoryMap: Record<string, string> = {};
-
-  for (const cat of categories) {
-    const created = await prisma.category.upsert({
-      where: { slug: cat.slug },
-      update: {},
-      create: {
-        name: cat.name,
-        slug: cat.slug,
-        sortOrder: cat.sortOrder,
-        imageUrl: `https://placehold.co/200x200/1FA54A/FFFFFF?text=${encodeURIComponent(cat.name)}`,
-      },
-    });
-    categoryMap[cat.slug] = created.id;
-  }
+  const categoryMap = await syncCategories(prisma);
+  console.log(`✅ Categories synced (${Object.keys(categoryMap).length} entries)`);
 
   const products = [
     {
       name: 'Fresh Tomatoes',
       slug: 'fresh-tomatoes',
       categorySlug: 'fruits-vegetables',
+      subcategorySlug: 'vegetables',
       basePrice: 35,
       discountPrice: 29,
       stock: 100,
@@ -113,7 +93,8 @@ async function main() {
     {
       name: 'Amul Taaza Milk 1L',
       slug: 'amul-taaza-milk-1l',
-      categorySlug: 'dairy-breakfast',
+      categorySlug: 'dairy-refrigerated',
+      subcategorySlug: 'milk',
       basePrice: 58,
       stock: 200,
       unit: 'pack',
@@ -123,7 +104,8 @@ async function main() {
     {
       name: 'Britannia Good Day Cookies',
       slug: 'britannia-good-day',
-      categorySlug: 'snacks-beverages',
+      categorySlug: 'bakery-breads',
+      subcategorySlug: 'bread',
       basePrice: 30,
       discountPrice: 25,
       stock: 150,
@@ -132,7 +114,8 @@ async function main() {
     {
       name: 'Basmati Rice 5kg',
       slug: 'basmati-rice-5kg',
-      categorySlug: 'staples-grains',
+      categorySlug: 'rice-flour-grains',
+      subcategorySlug: 'rice',
       basePrice: 450,
       discountPrice: 399,
       stock: 80,
@@ -141,7 +124,8 @@ async function main() {
     {
       name: 'Surf Excel Matic 2kg',
       slug: 'surf-excel-matic',
-      categorySlug: 'household',
+      categorySlug: 'cleaning-hygiene',
+      subcategorySlug: 'dishwash',
       basePrice: 320,
       discountPrice: 289,
       stock: 60,
@@ -151,6 +135,7 @@ async function main() {
       name: 'Bananas',
       slug: 'bananas',
       categorySlug: 'fruits-vegetables',
+      subcategorySlug: 'fresh-fruits',
       basePrice: 48,
       stock: 120,
       unit: 'dozen',
@@ -159,13 +144,17 @@ async function main() {
   ];
 
   for (const p of products) {
+    const data = {
+      categoryId: categoryMap[p.categorySlug],
+      subcategoryId: categoryMap[p.subcategorySlug] ?? null,
+    };
     await prisma.product.upsert({
       where: { slug: p.slug },
-      update: {},
+      update: data,
       create: {
         name: p.name,
         slug: p.slug,
-        categoryId: categoryMap[p.categorySlug],
+        ...data,
         basePrice: p.basePrice,
         discountPrice: p.discountPrice,
         stock: p.stock,
@@ -218,7 +207,7 @@ async function main() {
     update: {},
     create: {
       phone: partnerPhone,
-      email: 'partner@dailyrashan.com',
+      email: 'partner@dhrigro.com',
       name: 'Demo Delivery Partner',
       passwordHash: partnerHash,
       role: UserRole.DELIVERY_PARTNER,

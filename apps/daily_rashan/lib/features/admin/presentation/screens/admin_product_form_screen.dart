@@ -27,6 +27,7 @@ class _AdminProductFormScreenState
   final _stockController = TextEditingController(text: '0');
 
   String? _categoryId;
+  String? _subcategoryId;
   List<dynamic> _categories = [];
   List<ProductImageItem> _images = [];
   bool _isFeatured = false;
@@ -35,6 +36,17 @@ class _AdminProductFormScreenState
   String? _savedProductId;
 
   bool get isEdit => widget.productId != null;
+
+  /// Subcategories (children) of the currently selected category.
+  List<Map<String, dynamic>> get _subcategories {
+    final cat = _categories.firstWhere(
+      (c) => (c as Map<String, dynamic>)['id'] == _categoryId,
+      orElse: () => null,
+    );
+    if (cat == null) return const [];
+    final children = (cat as Map<String, dynamic>)['children'] as List? ?? [];
+    return children.cast<Map<String, dynamic>>();
+  }
 
   @override
   void initState() {
@@ -55,6 +67,7 @@ class _AdminProductFormScreenState
           : '';
       _stockController.text = '${product['stock']}';
       _categoryId = product['categoryId'] as String?;
+      _subcategoryId = product['subcategoryId'] as String?;
       _isFeatured = product['isFeatured'] as bool? ?? false;
       _savedProductId = widget.productId;
 
@@ -87,6 +100,7 @@ class _AdminProductFormScreenState
       'name': _nameController.text.trim(),
       'description': _descController.text.trim(),
       'categoryId': _categoryId,
+      'subcategoryId': _subcategoryId,
       'basePrice': double.parse(_priceController.text),
       if (_discountController.text.isNotEmpty)
         'discountPrice': double.parse(_discountController.text),
@@ -199,8 +213,31 @@ class _AdminProductFormScreenState
                   child: Text(cat['name'] as String? ?? ''),
                 );
               }).toList(),
-              onChanged: (v) => setState(() => _categoryId = v),
+              onChanged: (v) => setState(() {
+                _categoryId = v;
+                _subcategoryId = null;
+              }),
             ),
+            if (_subcategories.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              DropdownButtonFormField<String>(
+                value: _subcategoryId,
+                decoration: const InputDecoration(labelText: 'Subcategory'),
+                items: [
+                  const DropdownMenuItem<String>(
+                    value: null,
+                    child: Text('None'),
+                  ),
+                  ..._subcategories.map((s) {
+                    return DropdownMenuItem(
+                      value: s['id'] as String,
+                      child: Text(s['name'] as String? ?? ''),
+                    );
+                  }),
+                ],
+                onChanged: (v) => setState(() => _subcategoryId = v),
+              ),
+            ],
             const SizedBox(height: 16),
             TextFormField(
               controller: _descController,

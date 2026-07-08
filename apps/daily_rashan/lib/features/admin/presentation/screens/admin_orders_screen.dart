@@ -1,13 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
-import '../../../../core/constants/app_colors.dart';
+import '../../../../core/admin/admin_api_utils.dart';
+import '../../../../core/admin/admin_theme.dart';
 import '../../../../core/utils/csv_download.dart';
+import '../../../../shared/widgets/admin/admin_bulk_toolbar.dart';
 import '../../../../shared/widgets/admin/admin_data_table.dart';
+import '../../../../shared/widgets/admin/admin_ops_widgets.dart';
+import '../../../../shared/widgets/admin/admin_page_layout.dart';
 import '../../../../shared/widgets/admin/admin_search_bar.dart';
+import '../../../../shared/widgets/admin/admin_state_widgets.dart';
+import '../../../../shared/widgets/admin/admin_toast.dart';
 import '../../../../shared/widgets/admin/order_status_chip.dart';
 import '../../data/admin_repository.dart';
 import '../providers/admin_providers.dart';
+import '../widgets/admin_order_detail_sheet.dart';
 
 const _orderStatuses = [
   'PENDING',
@@ -27,6 +34,8 @@ class AdminOrdersScreen extends ConsumerStatefulWidget {
 
 class _AdminOrdersScreenState extends ConsumerState<AdminOrdersScreen> {
   late final DebouncedSearch _debouncedSearch;
+  final _searchFocus = FocusNode();
+  int _focusedRow = 0;
 
   @override
   void initState() {
@@ -41,84 +50,156 @@ class _AdminOrdersScreenState extends ConsumerState<AdminOrdersScreen> {
   @override
   void dispose() {
     _debouncedSearch.dispose();
+    _searchFocus.dispose();
     super.dispose();
+  }
+
+  void _toggleSelect(String id) {
+    final set = {...ref.read(adminOrderSelectionProvider)};
+    if (set.contains(id)) {
+      set.remove(id);
+    } else {
+      set.add(id);
+    }
+    ref.read(adminOrderSelectionProvider.notifier).state = set;
+  }
+
+  Future<void> _bulkStatus(String status) async {
+    final ids = ref.read(adminOrderSelectionProvider);
+    if (ids.isEmpty) return;
+    try {
+      for (final id in ids) {
+        await ref.read(adminRepositoryProvider).updateOrderStatus(id, status: status);
+      }
+      ref.read(adminOrderSelectionProvider.notifier).state = {};
+      ref.invalidate(adminOrdersListProvider);
+      if (mounted) AdminToast.success(context, 'Updated ${ids.length} orders');
+    } catch (e) {
+      if (mounted) AdminToast.errorFrom(context, e);
+    }
+  }
+
+  Future<void> _bulkExport() async {
+    await _exportCsv();
+  }
+
+  Future<void> _bulkAssign() async {
+    final ids = ref.read(adminOrderSelectionProvider);
+    if (ids.isEmpty) return;
+    if (ids.length == 1) {
+      showAdminOrderDetailSheet(
+        context,
+        orderId: ids.first,
+        onUpdated: () {
+          ref.invalidate(adminOrdersListProvider);
+          ref.read(adminOrderSelectionProvider.notifier).state = {};
+        },
+      );
+      return;
+    }
+    AdminToast.info(context, 'Open each order to assign partner (${ids.length} selected)');
+  }
+
+  Widget _presetChip(String label, OrderOpsFilter filter, OrderOpsFilter current) {
+    return FilterChip(
+      label: Text(label, style: const TextStyle(fontSize: 11)),
+      selected: current == filter,
+      onSelected: (_) {
+        ref.read(adminOrdersQueryProvider.notifier).state =
+            AdminOrdersQuery.preset(filter);
+      },
+    );
+  }
+
+  void _resetFilters() {
+    ref.read(adminOrdersQueryProvider.notifier).state = const AdminOrdersQuery();
   }
 
   Future<void> _exportCsv() async {
     final query = ref.read(adminOrdersQueryProvider);
-    final csv = await ref.read(adminRepositoryProvider).exportOrdersCsv(
-          search: query.search,
-          status: query.status,
-          fromDate: query.fromDate,
-          toDate: query.toDate,
-        );
-    await downloadCsv('orders.csv', csv);
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Orders CSV downloaded')),
-      );
+    try {
+      final csv = await ref.read(adminRepositoryProvider).exportOrdersCsv(
+            search: query.search,
+            status: query.status,
+            fromDate: query.fromDate,
+            toDate: query.toDate,
+          );
+      await downloadCsv('orders.csv', csv);
+      if (mounted) AdminToast.success(context, 'Orders CSV downloaded');
+    } catch (e) {
+      if (mounted) AdminToast.errorFrom(context, e);
     }
-  }
-
-  void _openOrderDetail(Map<String, dynamic> order) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (_) => _OrderDetailDrawer(
-        orderId: order['id'] as String,
-        onUpdated: () => ref.invalidate(adminOrdersListProvider),
-      ),
-    );
   }
 
   @override
   Widget build(BuildContext context) {
     final ordersAsync = ref.watch(adminOrdersListProvider);
     final query = ref.watch(adminOrdersQueryProvider);
+    final selection = ref.watch(adminOrderSelectionProvider);
+    final isMobile = MediaQuery.sizeOf(context).width < 768;
 
-    return Padding(
-      padding: const EdgeInsets.all(24),
-      child: Column(
+    return CallbackShortcuts(
+      bindings: {
+        const SingleActivator(LogicalKeyboardKey.slash): () => _searchFocus.requestFocus(),
+      },
+      child: Focus(
+        autofocus: true,
+        onKeyEvent: (_, event) {
+          if (event is! KeyDownEvent) return KeyEventResult.ignored;
+          final rows = ref.read(adminOrdersListProvider).valueOrNull?['data'] as List? ?? [];
+          if (rows.isEmpty) return KeyEventResult.ignored;
+          if (event.logicalKey == LogicalKeyboardKey.arrowDown ||
+              event.logicalKey == LogicalKeyboardKey.keyJ) {
+            setState(() => _focusedRow = (_focusedRow + 1).clamp(0, rows.length - 1));
+            return KeyEventResult.handled;
+          }
+          if (event.logicalKey == LogicalKeyboardKey.arrowUp ||
+              event.logicalKey == LogicalKeyboardKey.keyK) {
+            setState(() => _focusedRow = (_focusedRow - 1).clamp(0, rows.length - 1));
+            return KeyEventResult.handled;
+          }
+          if (event.logicalKey == LogicalKeyboardKey.enter) {
+            final o = rows[_focusedRow] as Map<String, dynamic>;
+            showAdminOrderDetailSheet(
+              context,
+              orderId: o['id'] as String,
+              onUpdated: () => ref.invalidate(adminOrdersListProvider),
+            );
+            return KeyEventResult.handled;
+          }
+          return KeyEventResult.ignored;
+        },
+        child: AdminPageLayout(
+      title: 'Orders',
+      subtitle: 'Fulfill and track customer orders',
+      actions: [
+        OutlinedButton.icon(
+          onPressed: _exportCsv,
+          icon: const Icon(Icons.download_outlined, size: 18),
+          label: Text(isMobile ? 'Export' : 'Export CSV'),
+        ),
+      ],
+      filters: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
+          AdminFiltersToolbar(
             children: [
-              Text('Orders', style: Theme.of(context).textTheme.headlineSmall),
-              const Spacer(),
-              OutlinedButton.icon(
-                onPressed: _exportCsv,
-                icon: const Icon(Icons.download),
-                label: const Text('Export CSV'),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                flex: 2,
+              SizedBox(
+                width: isMobile ? double.infinity : 280,
                 child: AdminSearchBar(
-                  hint: 'Search order #, name, phone',
+                  hint: 'Search order #, name, phone (/)',
+                  focusNode: _searchFocus,
                   onChanged: _debouncedSearch,
                 ),
               ),
-              const SizedBox(width: 12),
-              Expanded(
+              SizedBox(
+                width: isMobile ? double.infinity : 140,
                 child: DropdownButtonFormField<String?>(
                   value: query.status,
-                  decoration: const InputDecoration(
-                    labelText: 'Status',
-                    border: OutlineInputBorder(),
-                  ),
+                  decoration: const InputDecoration(labelText: 'Status', isDense: true),
                   items: [
-                    const DropdownMenuItem(value: null, child: Text('All')),
-                    ..._orderStatuses.map(
-                      (s) => DropdownMenuItem(value: s, child: Text(s)),
-                    ),
+                    const DropdownMenuItem(value: null, child: Text('All statuses')),
+                    ..._orderStatuses.map((s) => DropdownMenuItem(value: s, child: Text(s))),
                   ],
                   onChanged: (v) {
                     ref.read(adminOrdersQueryProvider.notifier).update(
@@ -127,364 +208,278 @@ class _AdminOrdersScreenState extends ConsumerState<AdminOrdersScreen> {
                   },
                 ),
               ),
+              SizedBox(
+                width: isMobile ? double.infinity : 130,
+                child: DropdownButtonFormField<String?>(
+                  value: query.paymentMethod,
+                  decoration: const InputDecoration(labelText: 'Payment', isDense: true),
+                  items: const [
+                    DropdownMenuItem(value: null, child: Text('All')),
+                    DropdownMenuItem(value: 'COD', child: Text('COD')),
+                    DropdownMenuItem(value: 'RAZORPAY', child: Text('Razorpay')),
+                  ],
+                  onChanged: (v) {
+                    ref.read(adminOrdersQueryProvider.notifier).update(
+                          (s) => s.copyWith(paymentMethod: v, page: 1, clearPayment: v == null),
+                        );
+                  },
+                ),
+              ),
             ],
           ),
-          const SizedBox(height: 16),
-          Expanded(
-            child: ordersAsync.when(
-              loading: () => const AdminDataTable<Map<String, dynamic>>(
-                columns: [],
-                rows: [],
-                isLoading: true,
-              ),
-              error: (e, _) => Center(child: Text('$e')),
-              data: (res) {
-                final rows = (res['data'] as List? ?? [])
-                    .cast<Map<String, dynamic>>();
-                final meta = res['meta'] as Map<String, dynamic>? ?? {};
-                final totalPages = meta['totalPages'] as int? ?? 1;
-                final page = meta['page'] as int? ?? 1;
-
-                return Column(
-                  children: [
-                    Expanded(
-                      child: SingleChildScrollView(
-                        child: AdminDataTable<Map<String, dynamic>>(
-                          columns: [
-                            AdminColumn(
-                              label: 'Order',
-                              flex: 2,
-                              cellBuilder: (o) => Text(
-                                o['orderNumber'] as String? ?? '',
-                                style: const TextStyle(fontWeight: FontWeight.w600),
-                              ),
-                            ),
-                            AdminColumn(
-                              label: 'Customer',
-                              flex: 2,
-                              cellBuilder: (o) {
-                                final u = o['user'] as Map<String, dynamic>?;
-                                return Text(u?['name'] as String? ?? '—');
-                              },
-                            ),
-                            AdminColumn(
-                              label: 'Status',
-                              cellBuilder: (o) => OrderStatusChip(
-                                status: o['status'] as String? ?? '',
-                              ),
-                            ),
-                            AdminColumn(
-                              label: 'Total',
-                              cellBuilder: (o) => Text('₹${o['totalAmount']}'),
-                            ),
-                            AdminColumn(
-                              label: 'Placed',
-                              flex: 2,
-                              cellBuilder: (o) {
-                                final placed = o['placedAt'] as String?;
-                                if (placed == null) return const Text('—');
-                                final dt = DateTime.tryParse(placed);
-                                return Text(
-                                  dt != null
-                                      ? DateFormat('dd MMM, HH:mm').format(dt)
-                                      : placed,
-                                );
-                              },
-                            ),
-                          ],
-                          rows: rows,
-                          onRowTap: _openOrderDetail,
-                        ),
-                      ),
-                    ),
-                    AdminPaginationBar(
-                      page: page,
-                      totalPages: totalPages,
-                      onPageChanged: (p) {
-                        ref.read(adminOrdersQueryProvider.notifier).update(
-                              (s) => s.copyWith(page: p),
-                            );
-                      },
-                    ),
-                  ],
-                );
-              },
-            ),
+          const SizedBox(height: AdminSpacing.sm),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              _presetChip('Delayed', OrderOpsFilter.delayed, query.opsFilter),
+              _presetChip('Unassigned', OrderOpsFilter.unassigned, query.opsFilter),
+              _presetChip('COD today', OrderOpsFilter.codToday, query.opsFilter),
+              _presetChip('Failed pay', OrderOpsFilter.failedPayments, query.opsFilter),
+              _presetChip('High value', OrderOpsFilter.highValue, query.opsFilter),
+              if (query.opsFilter != OrderOpsFilter.none)
+                ActionChip(
+                  label: const Text('Clear preset'),
+                  onPressed: _resetFilters,
+                ),
+            ],
           ),
         ],
       ),
-    );
-  }
-}
+      child: ordersAsync.when(
+        loading: () => const AdminLoadingState(message: 'Loading orders…'),
+        error: (e, _) => AdminErrorState(
+          error: e,
+          title: 'Could not load orders',
+          onRetry: () => ref.invalidate(adminOrdersListProvider),
+        ),
+        data: (res) {
+          final rows = AdminApiUtils.asMapList(res['data']);
+          final meta = AdminApiUtils.asMapOrNull(res['meta']) ?? <String, dynamic>{};
 
-class _OrderDetailDrawer extends ConsumerStatefulWidget {
-  const _OrderDetailDrawer({
-    required this.orderId,
-    required this.onUpdated,
-  });
+          if (rows.isEmpty) {
+            return AdminEmptyState(
+              title: 'No orders found',
+              message: 'Try adjusting filters or search terms.',
+              icon: Icons.inventory_2_outlined,
+              actionLabel: 'Reset filters',
+              onAction: _resetFilters,
+            );
+          }
 
-  final String orderId;
-  final VoidCallback onUpdated;
-
-  @override
-  ConsumerState<_OrderDetailDrawer> createState() => _OrderDetailDrawerState();
-}
-
-class _OrderDetailDrawerState extends ConsumerState<_OrderDetailDrawer> {
-  String? _selectedStatus;
-  String? _selectedSlotId;
-  bool _saving = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return FutureBuilder<Map<String, dynamic>>(
-      future: ref.read(adminRepositoryProvider).getOrder(widget.orderId),
-      builder: (context, snap) {
-        if (!snap.hasData) {
-          return const SizedBox(
-            height: 300,
-            child: Center(child: CircularProgressIndicator()),
-          );
-        }
-        final order = snap.data!;
-        _selectedStatus ??= order['status'] as String?;
-        final user = order['user'] as Map<String, dynamic>?;
-        final address = order['address'] as Map<String, dynamic>?;
-        final items = order['items'] as List? ?? [];
-        final logs = order['statusLogs'] as List? ?? [];
-        final slotsFuture = ref.read(adminRepositoryProvider).listDeliverySlots();
-
-        return DraggableScrollableSheet(
-          expand: false,
-          initialChildSize: 0.85,
-          maxChildSize: 0.95,
-          minChildSize: 0.5,
-          builder: (_, controller) => Padding(
-            padding: const EdgeInsets.all(24),
-            child: ListView(
-              controller: controller,
-              children: [
-                Text(
-                  order['orderNumber'] as String? ?? 'Order',
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
-                const SizedBox(height: 8),
-                OrderStatusChip(status: order['status'] as String? ?? ''),
-                const SizedBox(height: 16),
-                Text('Customer: ${user?['name']} · ${user?['phone']}'),
-                if (address != null)
-                  Text(
-                    'Address: ${address['line1']}, ${address['city']} ${address['pincode']}',
-                  ),
-                Text(
-                  'Payment: ${order['paymentMethod']} · ${order['paymentStatus']}',
-                ),
-                Text('Total: ₹${order['totalAmount']}'),
-                const Divider(height: 32),
-                Text('Items', style: Theme.of(context).textTheme.titleMedium),
-                ...items.map((i) {
-                  final item = i as Map<String, dynamic>;
-                  return ListTile(
-                    dense: true,
-                    title: Text(item['productName'] as String? ?? ''),
-                    trailing: Text('×${item['quantity']}'),
-                  );
-                }),
-                const Divider(height: 32),
-                Text('Timeline', style: Theme.of(context).textTheme.titleMedium),
-                ...logs.map((l) {
-                  final log = l as Map<String, dynamic>;
-                  return ListTile(
-                    leading: const Icon(Icons.circle, size: 8, color: AppColors.primaryGreen),
-                    title: Text(log['status'] as String? ?? ''),
-                    subtitle: Text(log['note'] as String? ?? ''),
-                  );
-                }),
-                const Divider(height: 32),
-                DropdownButtonFormField<String>(
-                  value: _selectedStatus,
-                  decoration: const InputDecoration(labelText: 'Update status'),
-                  items: _orderStatuses
-                      .map((s) => DropdownMenuItem(value: s, child: Text(s)))
-                      .toList(),
-                  onChanged: (v) => setState(() => _selectedStatus = v),
-                ),
-                const SizedBox(height: 12),
-                FutureBuilder<List<dynamic>>(
-                  future: slotsFuture,
-                  builder: (context, slotSnap) {
-                    final slots = slotSnap.data ?? [];
-                    return DropdownButtonFormField<String?>(
-                      value: _selectedSlotId ?? order['deliverySlotId'] as String?,
-                      decoration: const InputDecoration(labelText: 'Delivery slot'),
-                      items: slots.map((s) {
-                        final slot = s as Map<String, dynamic>;
-                        return DropdownMenuItem(
-                          value: slot['id'] as String,
-                          child: Text(
-                            '${slot['name'] ?? slot['label'] ?? slot['startTime']} - ${slot['endTime']}',
+          return Stack(
+            children: [
+              Column(
+                children: [
+                  if (rows.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(AdminSpacing.lg, AdminSpacing.sm, AdminSpacing.lg, 0),
+                      child: Row(
+                        children: [
+                          Checkbox(
+                            value: selection.length == rows.length && rows.isNotEmpty,
+                            tristate: true,
+                            onChanged: (_) {
+                              if (selection.length == rows.length) {
+                                ref.read(adminOrderSelectionProvider.notifier).state = {};
+                              } else {
+                                ref.read(adminOrderSelectionProvider.notifier).state =
+                                    rows.map((o) => o['id'] as String).toSet();
+                              }
+                            },
                           ),
-                        );
-                      }).toList(),
-                      onChanged: (v) => setState(() => _selectedSlotId = v),
-                    );
-                  },
-                ),
-                const SizedBox(height: 12),
-                _AssignPartnerSection(
-                  orderId: widget.orderId,
-                  currentPartnerId: (order['assignment'] as Map?)?['deliveryPartnerId'] as String?,
-                  onAssigned: widget.onUpdated,
-                ),
-                const SizedBox(height: 24),
-                FilledButton(
-                  onPressed: _saving
-                      ? null
-                      : () async {
-                          setState(() => _saving = true);
-                          try {
-                            if (_selectedStatus != null &&
-                                _selectedStatus != order['status']) {
-                              await ref
-                                  .read(adminRepositoryProvider)
-                                  .updateOrderStatus(
-                                    widget.orderId,
-                                    status: _selectedStatus!,
-                                  );
-                            }
-                            if (_selectedSlotId != null) {
-                              await ref
-                                  .read(adminRepositoryProvider)
-                                  .assignDeliverySlot(
-                                    widget.orderId,
-                                    _selectedSlotId!,
-                                  );
-                            }
-                            widget.onUpdated();
-                            if (context.mounted) Navigator.pop(context);
-                          } catch (e) {
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('$e')),
-                              );
-                            }
-                          } finally {
-                            if (mounted) setState(() => _saving = false);
-                          }
-                        },
-                  child: _saving
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Text('Save changes'),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _AssignPartnerSection extends ConsumerStatefulWidget {
-  const _AssignPartnerSection({
-    required this.orderId,
-    this.currentPartnerId,
-    required this.onAssigned,
-  });
-
-  final String orderId;
-  final String? currentPartnerId;
-  final VoidCallback onAssigned;
-
-  @override
-  ConsumerState<_AssignPartnerSection> createState() =>
-      _AssignPartnerSectionState();
-}
-
-class _AssignPartnerSectionState extends ConsumerState<_AssignPartnerSection> {
-  String? _selectedPartnerId;
-  bool _saving = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return FutureBuilder<List<dynamic>>(
-      future: ref.read(adminRepositoryProvider).listDeliveryPartners(),
-      builder: (context, snap) {
-        final partners = snap.data ?? [];
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            DropdownButtonFormField<String?>(
-              value: _selectedPartnerId ?? widget.currentPartnerId,
-              decoration: const InputDecoration(labelText: 'Delivery partner'),
-              items: [
-                const DropdownMenuItem(value: null, child: Text('Unassigned')),
-                ...partners.map((p) {
-                  final profile = p as Map<String, dynamic>;
-                  final user = profile['user'] as Map<String, dynamic>? ?? {};
-                  return DropdownMenuItem(
-                    value: user['id'] as String,
-                    child: Text(
-                      '${user['name']} (${profile['isOnline'] == true ? 'online' : 'offline'})',
+                          Text(
+                            'Select all on page',
+                            style: TextStyle(fontSize: 11, color: AdminSemanticColors.textMuted),
+                          ),
+                          const Spacer(),
+                          Text(
+                            'J/K navigate · Enter open · / search',
+                            style: TextStyle(fontSize: 10, color: AdminSemanticColors.textMuted),
+                          ),
+                        ],
+                      ),
                     ),
-                  );
-                }),
-              ],
-              onChanged: (v) => setState(() => _selectedPartnerId = v),
-            ),
-            const SizedBox(height: 8),
-            OutlinedButton(
-              onPressed: _saving || _selectedPartnerId == null
-                  ? null
-                  : () async {
-                      setState(() => _saving = true);
-                      try {
-                        if (widget.currentPartnerId != null) {
-                          await ref
-                              .read(adminRepositoryProvider)
-                              .reassignDeliveryPartner(
-                                orderId: widget.orderId,
-                                deliveryPartnerId: _selectedPartnerId!,
-                              );
-                        } else {
-                          await ref
-                              .read(adminRepositoryProvider)
-                              .assignDeliveryPartner(
-                                orderId: widget.orderId,
-                                deliveryPartnerId: _selectedPartnerId!,
-                              );
-                        }
-                        widget.onAssigned();
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Partner assigned')),
+                  Expanded(
+                    child: AdminDataTable<Map<String, dynamic>>(
+                      virtualized: !isMobile,
+                      zebraStripes: true,
+                      horizontalScroll: isMobile,
+                      trailingWidth: 132,
+                      leadingBuilder: (o) => SizedBox(
+                        width: 48,
+                        child: Checkbox(
+                          value: selection.contains(o['id']),
+                          onChanged: (_) => _toggleSelect(o['id'] as String),
+                        ),
+                      ),
+                      trailingBuilder: (o) => Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        AdminIconActionBtn(
+                          icon: Icons.visibility_outlined,
+                          tooltip: 'View',
+                          onPressed: () => showAdminOrderDetailSheet(
+                            context,
+                            orderId: o['id'] as String,
+                            onUpdated: () => ref.invalidate(adminOrdersListProvider),
+                          ),
+                        ),
+                        AdminIconActionBtn(
+                          icon: Icons.local_shipping_outlined,
+                          tooltip: 'Assign',
+                          onPressed: () => showAdminOrderDetailSheet(
+                            context,
+                            orderId: o['id'] as String,
+                            onUpdated: () => ref.invalidate(adminOrdersListProvider),
+                          ),
+                        ),
+                        AdminIconActionBtn(
+                          icon: Icons.print_outlined,
+                          tooltip: 'Print invoice',
+                          onPressed: () => AdminToast.info(context, 'Invoice print coming soon'),
+                        ),
+                      ],
+                    ),
+                    columns: [
+                      AdminColumn(
+                        label: 'Order / Customer',
+                        flex: 3,
+                        cellBuilder: (o) {
+                          final u = AdminApiUtils.asMapOrNull(o['user']);
+                          return Row(
+                            children: [
+                              AdminAvatar(name: u?['name'] as String?, size: 34),
+                              const SizedBox(width: AdminSpacing.md),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      u?['name'] as String? ?? 'Guest',
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 13,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    Text(
+                                      u?['phone'] as String? ?? '',
+                                      style: const TextStyle(
+                                        fontSize: 11,
+                                        color: AdminSemanticColors.textMuted,
+                                      ),
+                                    ),
+                                    Text(
+                                      '#${o['orderNumber']}',
+                                      style: const TextStyle(
+                                        fontSize: 10,
+                                        color: AdminSemanticColors.textSecondary,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
                           );
-                        }
-                      } catch (e) {
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('$e')),
+                        },
+                      ),
+                      AdminColumn(
+                        label: 'Status',
+                        cellBuilder: (o) => OrderStatusChip(status: o['status'] as String? ?? ''),
+                      ),
+                      AdminColumn(
+                        label: 'Tags',
+                        flex: 2,
+                        cellBuilder: (o) => Wrap(
+                          spacing: 4,
+                          runSpacing: 4,
+                          children: buildOrderMetaChips(o),
+                        ),
+                      ),
+                      AdminColumn(
+                        label: 'Total',
+                        align: TextAlign.end,
+                        cellBuilder: (o) => Text(
+                          '₹${o['totalAmount']}',
+                          style: const TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                      AdminColumn(
+                        label: 'Placed',
+                        flex: 2,
+                        cellBuilder: (o) => Text(
+                          formatOrderPlaced(o['placedAt'] as String?),
+                          style: const TextStyle(fontSize: 11),
+                        ),
+                      ),
+                    ],
+                    rows: rows,
+                    onRowTap: (o) => showAdminOrderDetailSheet(
+                      context,
+                      orderId: o['id'] as String,
+                      onUpdated: () => ref.invalidate(adminOrdersListProvider),
+                    ),
+                    emptyMessage: 'No orders found',
+                    emptyIcon: Icons.shopping_bag_outlined,
+                  ),
+                ),
+                  AdminPaginationBar(
+                    page: meta['page'] as int? ?? 1,
+                    totalPages: meta['totalPages'] as int? ?? 1,
+                    totalItems: meta['total'] as int?,
+                    onPageChanged: (p) {
+                      ref.read(adminOrdersQueryProvider.notifier).update(
+                            (s) => s.copyWith(page: p),
                           );
-                        }
-                      } finally {
-                        if (mounted) setState(() => _saving = false);
-                      }
                     },
-              child: _saving
-                  ? const SizedBox(
-                      height: 18,
-                      width: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : Text(widget.currentPartnerId != null ? 'Reassign' : 'Assign'),
-            ),
-          ],
-        );
-      },
+                  ),
+                ],
+              ),
+              if (selection.isNotEmpty)
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  child: AdminBulkToolbar(
+                    count: selection.length,
+                    onClear: () => ref.read(adminOrderSelectionProvider.notifier).state = {},
+                    actions: [
+                      TextButton.icon(
+                        onPressed: () => _bulkStatus('CONFIRMED'),
+                        icon: const Icon(Icons.check, color: Colors.white, size: 16),
+                        label: const Text('Confirm', style: TextStyle(color: Colors.white)),
+                      ),
+                      TextButton.icon(
+                        onPressed: () => _bulkStatus('PACKED'),
+                        icon: const Icon(Icons.inventory_2_outlined, color: Colors.white, size: 16),
+                        label: const Text('Packed', style: TextStyle(color: Colors.white)),
+                      ),
+                      TextButton.icon(
+                        onPressed: _bulkAssign,
+                        icon: const Icon(Icons.local_shipping_outlined, color: Colors.white, size: 16),
+                        label: const Text('Assign', style: TextStyle(color: Colors.white)),
+                      ),
+                      TextButton.icon(
+                        onPressed: _bulkExport,
+                        icon: const Icon(Icons.download_outlined, color: Colors.white, size: 16),
+                        label: const Text('Export', style: TextStyle(color: Colors.white)),
+                      ),
+                      TextButton.icon(
+                        onPressed: () => AdminToast.info(context, 'Bulk print coming soon'),
+                        icon: const Icon(Icons.print_outlined, color: Colors.white, size: 16),
+                        label: const Text('Print', style: TextStyle(color: Colors.white)),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          );
+        },
+      ),
+        ),
+      ),
     );
   }
 }

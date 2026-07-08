@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../core/admin/admin_api_utils.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../shared/widgets/admin/admin_data_table.dart';
+import '../../../../shared/widgets/admin/admin_state_widgets.dart';
 import '../../data/admin_repository.dart';
 import '../providers/admin_providers.dart';
 
@@ -153,9 +155,13 @@ class AdminCouponsScreen extends ConsumerWidget {
           Expanded(
             child: couponsAsync.when(
               loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, _) => Center(child: Text('$e')),
+              error: (e, _) => AdminErrorState(
+                error: e,
+                title: 'Could not load coupons',
+                onRetry: () => ref.invalidate(adminCouponsProvider),
+              ),
               data: (list) {
-                final rows = list.cast<Map<String, dynamic>>();
+                final rows = AdminApiUtils.asMapList(list);
                 return SingleChildScrollView(
                   child: AdminDataTable<Map<String, dynamic>>(
                     columns: [

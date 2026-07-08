@@ -27,11 +27,19 @@ import { DeliveryAssignmentsModule } from './modules/delivery-assignments/delive
 import { DeliveryPartnerModule } from './modules/delivery-partner/delivery-partner.module';
 import { LocationModule } from './common/location/location.module';
 import { RealtimeModule } from './common/realtime/realtime.module';
+import { MetricsModule } from './common/metrics/metrics.module';
+import { QueuesModule } from './common/queues/queues.module';
+import { AuditModule } from './common/audit/audit.module';
+import { AutomationModule } from './common/automation/automation.module';
 
 @Module({
   imports: [
     LocationModule,
     RealtimeModule,
+    MetricsModule,
+    QueuesModule,
+    AuditModule,
+    AutomationModule,
     ConfigModule.forRoot({
       isGlobal: true,
       load: [configuration],

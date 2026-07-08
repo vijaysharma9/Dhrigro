@@ -1,30 +1,66 @@
-# Load Testing
+# Daily Rashan — Load Testing
 
-## k6 — home feed
+Benchmark targets for production readiness.
+
+## Targets
+
+| Scenario | VUs / rate | Duration | p95 latency | Error rate |
+|----------|------------|----------|-------------|------------|
+| Customer browse | 500 VUs | 8 min ramp | < 800ms | < 2% |
+| Checkout flow | 50 VUs | 3 min | < 1200ms | < 5% |
+| Admin dashboard | 100 concurrent | 5 min | < 1000ms | < 2% |
+| Delivery partners | 50 concurrent | 5 min | < 800ms | < 2% |
+| Orders scale | 10k orders/day | sustained | — | — |
+
+## Prerequisites
 
 ```bash
-k6 run load-tests/k6-home.js
+cd backend && npm run start:dev
+npm run prisma:seed   # seeded products + admin
 ```
 
-Set `API_URL` env to your staging API base (without trailing slash for script).
+## k6
+
+```bash
+# Install: brew install k6
+
+# Home browse — 500 customer simulation
+k6 run load-tests/k6-full-suite.js
+
+# Authenticated cart flow
+k6 run load-tests/k6-checkout.js
+
+# Custom API URL
+API_URL=https://staging.api.dhrigro.com k6 run load-tests/k6-full-suite.js
+```
+
+Reports written to `load-tests/reports/k6-benchmark.json`.
 
 ## Artillery
 
 ```bash
-npx artillery run load-tests/artillery.yml
+npm install -g artillery
+artillery run load-tests/artillery-full.yml
+artillery run load-tests/artillery.yml
 ```
 
-## Scenarios covered
+## WebSocket stability (manual + k6 extension)
 
-| Script | Target |
-|--------|--------|
-| `k6-home.js` | `GET /api/v1/home` |
-| `artillery.yml` | health + home + products |
+Use `docs/QA_CHECKLIST.md` WebSocket section. For automated WS load, use k6 `websockets` module against `/realtime` with valid JWT.
 
-## Benchmark targets (MVP)
+## Queue performance
 
-| Endpoint | p95 target |
-|----------|------------|
-| `/health` | < 50ms |
-| `/api/v1/home` | < 300ms (cached) |
-| `/api/v1/admin/dashboard` | < 800ms (cached) |
+During load test, monitor:
+
+```bash
+curl http://localhost:3000/metrics | grep bullmq
+curl -H "Authorization: Bearer $ADMIN_TOKEN" http://localhost:3000/api/v1/admin/system/health
+```
+
+## Benchmark report template
+
+| Run date | Script | VUs | p95 (ms) | RPS | Fail % | Pass |
+|----------|--------|-----|----------|-----|--------|------|
+| YYYY-MM-DD | k6-full-suite | 500 | | | | |
+
+Store results in `load-tests/reports/`.

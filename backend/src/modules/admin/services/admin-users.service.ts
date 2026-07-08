@@ -53,13 +53,22 @@ export class AdminUsersService {
 
     const data = await Promise.all(
       users.map(async (u) => {
-        const spend = await this.prisma.order.aggregate({
-          where: { userId: u.id, status: { not: 'CANCELLED' } },
-          _sum: { totalAmount: true },
-        });
+        const [spend, lastOrder] = await Promise.all([
+          this.prisma.order.aggregate({
+            where: { userId: u.id, status: { not: 'CANCELLED' } },
+            _sum: { totalAmount: true },
+          }),
+          this.prisma.order.findFirst({
+            where: { userId: u.id },
+            orderBy: { placedAt: 'desc' },
+            select: { placedAt: true, paymentMethod: true },
+          }),
+        ]);
         return {
           ...u,
           totalSpend: Number(spend._sum.totalAmount || 0),
+          lastOrderAt: lastOrder?.placedAt ?? null,
+          preferredPaymentMethod: lastOrder?.paymentMethod ?? null,
         };
       }),
     );
@@ -91,12 +100,30 @@ export class AdminUsersService {
       where: { userId: id, couponId: { not: null } },
     });
 
+    const lastOrder = user.orders[0];
+    const totalOrders = totalSpend._count;
+    const totalSpendNum = Number(totalSpend._sum.totalAmount || 0);
+    const avgOrderValue = totalOrders > 0 ? totalSpendNum / totalOrders : 0;
+
+    const paymentMethods = await this.prisma.order.groupBy({
+      by: ['paymentMethod'],
+      where: { userId: id, status: { not: 'CANCELLED' } },
+      _count: true,
+    });
+    const preferredPayment =
+      paymentMethods.sort((a, b) => b._count - a._count)[0]?.paymentMethod ?? null;
+
     return {
       ...user,
       stats: {
-        totalOrders: totalSpend._count,
-        totalSpend: Number(totalSpend._sum.totalAmount || 0),
+        totalOrders,
+        totalSpend: totalSpendNum,
         couponsUsed,
+        avgOrderValue,
+        repeatPurchaseRate:
+          totalOrders > 1 ? Math.min(100, ((totalOrders - 1) / totalOrders) * 100) : 0,
+        lastOrderAt: lastOrder?.placedAt ?? null,
+        preferredPaymentMethod: preferredPayment,
       },
     };
   }

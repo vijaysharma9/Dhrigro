@@ -7,11 +7,13 @@ class AdminPermissions {
     'orders',
     'users',
     'products',
+    'categories',
     'inventory',
     'coupons',
     'banners',
     'delivery',
     'reports',
+    'system',
   ];
 
   static List<String> sectionsForRole(String? role) {
@@ -19,9 +21,16 @@ class AdminPermissions {
       case 'SUPER_ADMIN':
         return allSections;
       case 'OPERATIONS_ADMIN':
-        return ['dashboard', 'orders', 'delivery', 'reports'];
+        return ['dashboard', 'orders', 'delivery', 'reports', 'system'];
       case 'INVENTORY_MANAGER':
-        return ['dashboard', 'products', 'inventory', 'banners', 'reports'];
+        return [
+          'dashboard',
+          'products',
+          'categories',
+          'inventory',
+          'banners',
+          'reports',
+        ];
       case 'CUSTOMER_SUPPORT':
         return ['dashboard', 'orders', 'users', 'coupons'];
       default:

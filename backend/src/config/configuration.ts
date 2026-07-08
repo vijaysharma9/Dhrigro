@@ -2,7 +2,10 @@ export default () => ({
   nodeEnv: process.env.NODE_ENV || 'development',
   port: parseInt(process.env.API_PORT || '3000', 10),
   apiPrefix: process.env.API_PREFIX || 'api/v1',
-  corsOrigins: (process.env.CORS_ORIGINS || 'http://localhost:8080').split(','),
+  corsOrigins: (
+    process.env.CORS_ORIGINS ||
+    'http://localhost:8080,http://localhost:8081,http://127.0.0.1:8080,http://127.0.0.1:8081'
+  ).split(','),
   databaseUrl: process.env.DATABASE_URL,
   redis: {
     url: process.env.REDIS_URL || 'redis://localhost:6379',
@@ -49,4 +52,10 @@ export default () => ({
     dsn: process.env.SENTRY_DSN,
   },
   logLevel: process.env.LOG_LEVEL || 'info',
+  realtime: {
+    enabled: process.env.REALTIME_ENABLED !== 'false',
+  },
+  queues: {
+    enabled: process.env.QUEUES_ENABLED !== 'false',
+  },
 });

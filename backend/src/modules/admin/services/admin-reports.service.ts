@@ -88,6 +88,130 @@ export class AdminReportsService {
     }));
   }
 
+  /**
+   * Category analytics: products per category/subcategory, low-stock counts,
+   * inventory value per category and top-selling categories.
+   */
+  async categoriesReport(query: AdminReportsQueryDto) {
+    const LOW_STOCK_THRESHOLD = 10;
+
+    const [categories, products] = await Promise.all([
+      this.prisma.category.findMany({
+        where: { parentId: null, deletedAt: null },
+        orderBy: { sortOrder: 'asc' },
+        include: {
+          children: {
+            where: { deletedAt: null },
+            orderBy: { sortOrder: 'asc' },
+            select: { id: true, name: true, slug: true },
+          },
+        },
+      }),
+      this.prisma.product.findMany({
+        where: { deletedAt: null, isActive: true },
+        select: {
+          categoryId: true,
+          subcategoryId: true,
+          stock: true,
+          basePrice: true,
+        },
+      }),
+    ]);
+
+    const subAgg = new Map<string, number>();
+    const catAgg = new Map<
+      string,
+      { productCount: number; lowStock: number; inventoryValue: number }
+    >();
+    for (const p of products) {
+      const bucket = catAgg.get(p.categoryId) ?? {
+        productCount: 0,
+        lowStock: 0,
+        inventoryValue: 0,
+      };
+      bucket.productCount += 1;
+      if (p.stock <= LOW_STOCK_THRESHOLD) bucket.lowStock += 1;
+      bucket.inventoryValue += p.stock * Number(p.basePrice);
+      catAgg.set(p.categoryId, bucket);
+      if (p.subcategoryId) {
+        subAgg.set(p.subcategoryId, (subAgg.get(p.subcategoryId) ?? 0) + 1);
+      }
+    }
+
+    // Top selling categories (by quantity in the selected window).
+    const where = this.dateRange(query);
+    const orderIds = await this.prisma.order.findMany({
+      where,
+      select: { id: true },
+    });
+    const items = await this.prisma.orderItem.groupBy({
+      by: ['productId'],
+      where: { orderId: { in: orderIds.map((o) => o.id) } },
+      _sum: { quantity: true, totalPrice: true },
+    });
+    const productCategory = await this.prisma.product.findMany({
+      where: { id: { in: items.map((i) => i.productId) } },
+      select: { id: true, categoryId: true },
+    });
+    const prodToCat = new Map(productCategory.map((p) => [p.id, p.categoryId]));
+    const sellingByCat = new Map<string, { quantity: number; revenue: number }>();
+    for (const i of items) {
+      const catId = prodToCat.get(i.productId);
+      if (!catId) continue;
+      const b = sellingByCat.get(catId) ?? { quantity: 0, revenue: 0 };
+      b.quantity += i._sum.quantity ?? 0;
+      b.revenue += Number(i._sum.totalPrice ?? 0);
+      sellingByCat.set(catId, b);
+    }
+
+    const byCategory = categories.map((c) => {
+      const agg = catAgg.get(c.id) ?? {
+        productCount: 0,
+        lowStock: 0,
+        inventoryValue: 0,
+      };
+      return {
+        id: c.id,
+        name: c.name,
+        slug: c.slug,
+        icon: c.icon,
+        color: c.color,
+        productCount: agg.productCount,
+        lowStock: agg.lowStock,
+        inventoryValue: Math.round(agg.inventoryValue),
+        subcategories: c.children.map((s) => ({
+          id: s.id,
+          name: s.name,
+          slug: s.slug,
+          productCount: subAgg.get(s.id) ?? 0,
+        })),
+      };
+    });
+
+    const topSelling = categories
+      .map((c) => ({
+        id: c.id,
+        name: c.name,
+        color: c.color,
+        quantitySold: sellingByCat.get(c.id)?.quantity ?? 0,
+        revenue: Math.round(sellingByCat.get(c.id)?.revenue ?? 0),
+      }))
+      .filter((c) => c.quantitySold > 0)
+      .sort((a, b) => b.quantitySold - a.quantitySold)
+      .slice(0, 10);
+
+    return {
+      totals: {
+        categories: categories.length,
+        products: products.length,
+        lowStock: byCategory.reduce((s, c) => s + c.lowStock, 0),
+        inventoryValue: byCategory.reduce((s, c) => s + c.inventoryValue, 0),
+      },
+      byCategory,
+      topSelling,
+    };
+  }
+
   async exportReport(type: string, query: AdminReportsQueryDto): Promise<string> {
     const where = this.dateRange(query);
 

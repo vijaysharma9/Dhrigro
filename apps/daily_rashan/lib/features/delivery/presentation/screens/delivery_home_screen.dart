@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../shared/widgets/empty_state_widget.dart';
 import '../../data/delivery_repository.dart';
 import '../providers/delivery_providers.dart';
 import '../widgets/delivery_shell.dart';
@@ -67,7 +68,13 @@ class _DeliveryProfileTab extends ConsumerWidget {
 
     return profileAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Center(child: Text('$e')),
+      error: (e, _) => EmptyStateWidget(
+        icon: Icons.person_outline,
+        title: 'Could not load profile',
+        subtitle: 'Check your connection and try again',
+        actionLabel: 'Retry',
+        onAction: () => ref.invalidate(deliveryProfileProvider),
+      ),
       data: (data) {
         final user = data['user'] as Map<String, dynamic>? ?? {};
         final profile = data['profile'] as Map<String, dynamic>? ?? {};

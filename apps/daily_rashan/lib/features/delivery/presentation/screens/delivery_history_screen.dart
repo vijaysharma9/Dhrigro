@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../shared/widgets/empty_state_widget.dart';
 import '../providers/delivery_providers.dart';
 
 class DeliveryHistoryScreen extends ConsumerWidget {
@@ -11,7 +12,13 @@ class DeliveryHistoryScreen extends ConsumerWidget {
 
     return historyAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Center(child: Text('$e')),
+      error: (e, _) => EmptyStateWidget(
+        icon: Icons.history,
+        title: 'Could not load history',
+        subtitle: 'Check your connection and try again',
+        actionLabel: 'Retry',
+        onAction: () => ref.invalidate(deliveryHistoryProvider),
+      ),
       data: (res) {
         final list = (res['data'] as List? ?? []).cast<Map<String, dynamic>>();
         return RefreshIndicator(

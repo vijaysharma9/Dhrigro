@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../shared/widgets/app_error_snackbar.dart';
 import '../../data/delivery_repository.dart';
 
 class DeliveryOtpScreen extends ConsumerStatefulWidget {
@@ -32,11 +33,7 @@ class _DeliveryOtpScreenState extends ConsumerState<DeliveryOtpScreen> {
           );
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('$e'), backgroundColor: AppColors.errorRed),
-        );
-      }
+      if (mounted) showAppErrorSnackBar(context, e);
     } finally {
       if (mounted) setState(() => _loading = false);
     }

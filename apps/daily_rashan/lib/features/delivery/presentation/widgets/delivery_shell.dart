@@ -24,7 +24,7 @@ class DeliveryShell extends StatelessWidget {
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
       appBar: AppBar(
-        title: const Text('Daily Rashan Delivery'),
+        title: const Text('Dhrigro Delivery'),
         backgroundColor: AppColors.primaryGreen,
         foregroundColor: Colors.white,
         actions: [

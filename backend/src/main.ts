@@ -25,7 +25,7 @@ async function bootstrap() {
 
   const apiPrefix = configService.get<string>('apiPrefix') || 'api/v1';
   app.setGlobalPrefix(apiPrefix, {
-    exclude: ['health', 'health/(.*)'],
+    exclude: ['health', 'health/(.*)', 'metrics'],
   });
 
   app.useGlobalPipes(
@@ -41,7 +41,7 @@ async function bootstrap() {
 
   if (nodeEnv !== 'production') {
     const swaggerConfig = new DocumentBuilder()
-      .setTitle('Daily Rashan API')
+      .setTitle('Dhrigro API')
       .setDescription('Grocery delivery platform REST API')
       .setVersion('1.0')
       .addBearerAuth()

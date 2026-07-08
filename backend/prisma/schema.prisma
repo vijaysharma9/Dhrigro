@@ -85,6 +85,7 @@ model User {
   notifications Notification[]
   refreshTokens RefreshToken[]
   otpRecords    OtpRecord[]
+  adminAuditLogs AdminAuditLog[]
   cart                  Cart?
   deliveryPartnerProfile DeliveryPartnerProfile?
   deliveryAssignments   DeliveryAssignment[] @relation("DeliveryPartnerAssignments")
@@ -151,19 +152,25 @@ model Category {
   slug        String    @unique
   description String?
   imageUrl    String?
+  icon        String?
+  color       String?
   sortOrder   Int       @default(0)
   isActive    Boolean   @default(true)
+  isFeatured  Boolean   @default(false)
+  aliases     String[]  @default([])
   parentId    String?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   deletedAt   DateTime?
 
-  parent   Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id])
-  children Category[] @relation("CategoryHierarchy")
-  products Product[]
+  parent              Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children            Category[] @relation("CategoryHierarchy")
+  products            Product[]  @relation("ProductCategory")
+  subcategoryProducts Product[]  @relation("ProductSubcategory")
 
   @@index([slug])
   @@index([isActive])
+  @@index([parentId])
 }
 
 model Product {
@@ -172,6 +179,7 @@ model Product {
   slug             String    @unique
   description      String?
   categoryId       String
+  subcategoryId    String?
   basePrice        Decimal   @db.Decimal(10, 2)
   discountPrice    Decimal?  @db.Decimal(10, 2)
   discountPercent  Int?
@@ -191,7 +199,8 @@ model Product {
   updatedAt        DateTime  @updatedAt
   deletedAt        DateTime?
 
-  category      Category         @relation(fields: [categoryId], references: [id])
+  category      Category         @relation("ProductCategory", fields: [categoryId], references: [id])
+  subcategory   Category?        @relation("ProductSubcategory", fields: [subcategoryId], references: [id])
   variants      ProductVariant[]
   orderItems    OrderItem[]
   cartItems     CartItem[]
@@ -200,6 +209,7 @@ model Product {
   productImages ProductImage[]
 
   @@index([categoryId])
+  @@index([subcategoryId])
   @@index([slug])
   @@index([isActive, isFeatured])
 }
@@ -563,4 +573,22 @@ model NotificationDeliveryLog {
 
   @@index([userId, createdAt])
   @@index([status])
+}
+
+model AdminAuditLog {
+  id         String   @id @default(uuid())
+  userId     String
+  action     String
+  resource   String
+  resourceId String?
+  metadata   Json?
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([createdAt])
+  @@index([resource, resourceId])
 }

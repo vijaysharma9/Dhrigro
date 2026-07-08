@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../shared/widgets/app_error_snackbar.dart';
+import '../../../../shared/widgets/empty_state_widget.dart';
 import '../../data/delivery_repository.dart';
 import 'delivery_otp_screen.dart';
 
@@ -19,6 +21,7 @@ class _DeliveryOrderDetailScreenState
     extends ConsumerState<DeliveryOrderDetailScreen> {
   Map<String, dynamic>? _assignment;
   bool _loading = true;
+  String? _loadError;
 
   @override
   void initState() {
@@ -27,11 +30,21 @@ class _DeliveryOrderDetailScreenState
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _loadError = null;
+    });
     try {
       final data =
           await ref.read(deliveryRepositoryProvider).getOrder(widget.orderId);
-      setState(() => _assignment = data);
+      if (mounted) setState(() => _assignment = data);
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _assignment = null;
+          _loadError = 'Could not load order details';
+        });
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -47,11 +60,7 @@ class _DeliveryOrderDetailScreenState
         );
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('$e'), backgroundColor: AppColors.errorRed),
-        );
-      }
+      if (mounted) showAppErrorSnackBar(context, e);
     }
   }
 
@@ -81,6 +90,23 @@ class _DeliveryOrderDetailScreenState
   Widget build(BuildContext context) {
     if (_loading) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
+    if (_loadError != null) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('Order'),
+          backgroundColor: AppColors.primaryGreen,
+          foregroundColor: Colors.white,
+        ),
+        body: EmptyStateWidget(
+          icon: Icons.local_shipping_outlined,
+          title: _loadError!,
+          subtitle: 'Check your connection and try again',
+          actionLabel: 'Retry',
+          onAction: _load,
+        ),
+      );
     }
 
     final assignment = _assignment;
@@ -182,11 +208,7 @@ class _DeliveryOrderDetailScreenState
                     );
                   }
                 } catch (e) {
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('$e')),
-                    );
-                  }
+                  if (mounted) showAppErrorSnackBar(context, e);
                 }
               },
               child: const Text('Resend OTP to customer'),

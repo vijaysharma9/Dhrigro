@@ -24,7 +24,7 @@ class PushNotificationService {
   PushNotificationService(this._ref);
 
   final Ref _ref;
-  final FirebaseMessaging _messaging = FirebaseMessaging.instance;
+  FirebaseMessaging? _messaging;
   final FlutterLocalNotificationsPlugin _localNotifications =
       FlutterLocalNotificationsPlugin();
 
@@ -40,6 +40,7 @@ class PushNotificationService {
     }
 
     await Firebase.initializeApp(options: options);
+    _messaging = FirebaseMessaging.instance;
     FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
 
     if (!kIsWeb) {
@@ -50,7 +51,7 @@ class PushNotificationService {
     FirebaseMessaging.onMessage.listen(_onForegroundMessage);
     FirebaseMessaging.onMessageOpenedApp.listen(_onNotificationTap);
 
-    final initial = await _messaging.getInitialMessage();
+    final initial = await _messaging!.getInitialMessage();
     if (initial != null) {
       _handleNotificationData(initial.data);
     }
@@ -85,7 +86,7 @@ class PushNotificationService {
   }
 
   Future<void> _requestPermission() async {
-    await _messaging.requestPermission(
+    await _messaging!.requestPermission(
       alert: true,
       badge: true,
       sound: true,
@@ -93,8 +94,10 @@ class PushNotificationService {
   }
 
   Future<void> syncFcmToken() async {
+    final messaging = _messaging;
+    if (messaging == null) return;
     try {
-      final token = await _messaging.getToken();
+      final token = await messaging.getToken();
       if (token == null) return;
 
       final isLoggedIn = await _ref.read(authRepositoryProvider).isLoggedIn();
