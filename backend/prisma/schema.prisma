@@ -104,6 +104,7 @@ model RefreshToken {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+  @@index([expiresAt])
 }
 
 model OtpRecord {
@@ -119,6 +120,7 @@ model OtpRecord {
   user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@index([phone, purpose])
+  @@index([expiresAt])
 }
 
 model Address {
@@ -212,6 +214,7 @@ model Product {
   @@index([subcategoryId])
   @@index([slug])
   @@index([isActive, isFeatured])
+  @@index([deletedAt])
 }
 
 model ProductImage {
