@@ -16,6 +16,7 @@ on:
     branches: [main]
     paths:
       - 'apps/daily_rashan/**'
+      - 'backend/**'
       - '.github/workflows/deploy-vercel.yml'
       - 'scripts/build-vercel.sh'
 
@@ -23,8 +24,45 @@ concurrency:
   group: deploy-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  API_BASE_URL: ${{ vars.API_BASE_URL != '' && vars.API_BASE_URL || 'https://api.dhrigro.com/api/v1' }}
+
 jobs:
+  quality-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Flutter analyze
+        working-directory: apps/daily_rashan
+        run: |
+          flutter pub get
+          flutter analyze lib
+
+      - name: Flutter test
+        working-directory: apps/daily_rashan
+        run: flutter test test/ --no-pub
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: NestJS build
+        working-directory: backend
+        run: |
+          npm ci
+          npx prisma generate
+          npm run build
+
   deploy-customer:
+    needs: quality-gate
     if: >-
       github.event_name == 'push' ||
       github.event.inputs.target == 'all' ||
@@ -41,11 +79,12 @@ jobs:
 
       - name: Build customer web app
         env:
-          API_BASE_URL: ${{ vars.API_BASE_URL != '' && vars.API_BASE_URL || 'https://api.dhrigro.com/api/v1' }}
+          API_BASE_URL: ${{ env.API_BASE_URL }}
           ENV: production
         run: ./scripts/build-vercel.sh customer
 
       - name: Deploy to Vercel (customer)
+        id: deploy_customer
         uses: amondnet/vercel-action@v25
         with:
           vercel-token: ${{ secrets.VERCEL_TOKEN }}
@@ -55,6 +94,7 @@ jobs:
           vercel-args: '--prod'
 
   deploy-admin:
+    needs: quality-gate
     if: >-
       github.event_name == 'push' ||
       github.event.inputs.target == 'all' ||
@@ -71,11 +111,12 @@ jobs:
 
       - name: Build admin web app
         env:
-          API_BASE_URL: ${{ vars.API_BASE_URL != '' && vars.API_BASE_URL || 'https://api.dhrigro.com/api/v1' }}
+          API_BASE_URL: ${{ env.API_BASE_URL }}
           ENV: production
         run: ./scripts/build-vercel.sh admin
 
       - name: Deploy to Vercel (admin)
+        id: deploy_admin
         uses: amondnet/vercel-action@v25
         with:
           vercel-token: ${{ secrets.VERCEL_TOKEN }}
@@ -83,3 +124,20 @@ jobs:
           vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID_ADMIN }}
           working-directory: apps/daily_rashan/build/web
           vercel-args: '--prod'
+
+  summary:
+    needs: [quality-gate, deploy-customer, deploy-admin]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deployment summary
+        run: |
+          echo "## Dhrigro deployment summary" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Job | Result |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|-----|--------|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Quality gate | ${{ needs.quality-gate.result }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Customer deploy | ${{ needs.deploy-customer.result }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Admin deploy | ${{ needs.deploy-admin.result }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "API base URL: ${{ env.API_BASE_URL }}" >> "$GITHUB_STEP_SUMMARY"
