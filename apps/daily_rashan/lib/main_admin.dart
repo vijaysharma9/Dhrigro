@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/admin/admin_theme_mode_provider.dart';
@@ -8,21 +9,39 @@ import 'features/admin/presentation/screens/admin_auth_gate.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  ErrorWidget.builder = (details) {
-    return Material(
-      color: const Color(0xFFF5F7FA),
-      child: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Text(
-            details.exceptionAsString(),
-            textAlign: TextAlign.center,
-            style: const TextStyle(color: Color(0xFFDC2626), fontSize: 13),
+  if (kReleaseMode) {
+    ErrorWidget.builder = (details) {
+      return const Material(
+        color: Color(0xFFF5F7FA),
+        child: Center(
+          child: Padding(
+            padding: EdgeInsets.all(24),
+            child: Text(
+              'Something went wrong. Please refresh and try again.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Color(0xFFDC2626), fontSize: 14),
+            ),
           ),
         ),
-      ),
-    );
-  };
+      );
+    };
+  } else {
+    ErrorWidget.builder = (details) {
+      return Material(
+        color: const Color(0xFFF5F7FA),
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Text(
+              details.exceptionAsString(),
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Color(0xFFDC2626), fontSize: 13),
+            ),
+          ),
+        ),
+      );
+    };
+  }
 
   await EnvConfig.load();
   EnvConfig.validate();

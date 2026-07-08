@@ -39,6 +39,12 @@ class EnvConfig {
     if (apiBaseUrl.isEmpty) {
       throw StateError('API_BASE_URL is required');
     }
+    if (isProduction &&
+        (apiBaseUrl.contains('localhost') || apiBaseUrl.contains('127.0.0.1'))) {
+      throw StateError(
+        'API_BASE_URL must be a production URL when ENV=production',
+      );
+    }
   }
 
   static String get apiBaseUrl {

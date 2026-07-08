@@ -69,6 +69,7 @@ class PremiumProductCard extends StatelessWidget {
                           child: CachedNetworkImage(
                             imageUrl: imageUrl,
                             fit: BoxFit.cover,
+                            memCacheWidth: 320,
                             placeholder: (_, __) => Container(color: Colors.grey.shade100),
                             errorWidget: (_, __, ___) => Container(
                               color: AppColors.primaryGreen.withValues(alpha: 0.08),
@@ -84,6 +85,7 @@ class PremiumProductCard extends StatelessWidget {
                             width: width,
                             height: horizontalImageHeight,
                             fit: BoxFit.cover,
+                            memCacheWidth: 320,
                             placeholder: (_, __) => Container(color: Colors.grey.shade100),
                             errorWidget: (_, __, ___) => Container(
                               color: AppColors.primaryGreen.withValues(alpha: 0.08),

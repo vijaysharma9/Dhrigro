@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'env_config.dart';
 
 class ApiException implements Exception {
   ApiException(this.message, {this.statusCode, this.code});
@@ -52,7 +53,9 @@ class ApiException implements Exception {
       case DioExceptionType.receiveTimeout:
         return 'Request timed out. Check your connection and try again.';
       case DioExceptionType.connectionError:
-        return 'Cannot reach the API server. Start the backend on port 3000 and retry.';
+        return EnvConfig.isProduction
+            ? 'Cannot reach the server. Check your connection and try again.'
+            : 'Cannot reach the API server. Start the backend on port 3000 and retry.';
       case DioExceptionType.badResponse:
         return 'Server error (${e.response?.statusCode ?? 'unknown'})';
       case DioExceptionType.cancel:
@@ -64,7 +67,9 @@ class ApiException implements Exception {
         if (raw.contains('XMLHttpRequest') ||
             raw.contains('NetworkError') ||
             raw.contains('Failed host lookup')) {
-          return 'Cannot reach the API server. Ensure the backend is running at ${e.requestOptions.baseUrl}';
+          return EnvConfig.isProduction
+              ? 'Cannot reach the server. Check your connection and try again.'
+              : 'Cannot reach the API server. Ensure the backend is running at ${e.requestOptions.baseUrl}';
         }
         return raw.isNotEmpty ? raw : 'Network request failed';
     }
