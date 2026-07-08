@@ -1,5 +1,5 @@
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import configuration from './config/configuration';
@@ -31,6 +31,7 @@ import { MetricsModule } from './common/metrics/metrics.module';
 import { QueuesModule } from './common/queues/queues.module';
 import { AuditModule } from './common/audit/audit.module';
 import { AutomationModule } from './common/automation/automation.module';
+import { MonitoringModule } from './common/monitoring/monitoring.module';
 
 @Module({
   imports: [
@@ -40,6 +41,7 @@ import { AutomationModule } from './common/automation/automation.module';
     QueuesModule,
     AuditModule,
     AutomationModule,
+    MonitoringModule,
     ConfigModule.forRoot({
       isGlobal: true,
       load: [configuration],
@@ -49,10 +51,11 @@ import { AutomationModule } from './common/automation/automation.module';
       ],
     }),
     ThrottlerModule.forRootAsync({
-      useFactory: () => [
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => [
         {
-          ttl: parseInt(process.env.THROTTLE_TTL || '60', 10) * 1000,
-          limit: parseInt(process.env.THROTTLE_LIMIT || '100', 10),
+          ttl: config.get<number>('rateLimit.ttlMs') || 60000,
+          limit: config.get<number>('rateLimit.limit') || 100,
         },
       ],
     }),
