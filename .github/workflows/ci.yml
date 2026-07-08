@@ -1,0 +1,90 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: rashan
+          POSTGRES_PASSWORD: rashan_secret
+          POSTGRES_DB: daily_rashan_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+
+    env:
+      DATABASE_URL: postgresql://rashan:rashan_secret@localhost:5432/daily_rashan_test?schema=public
+      JWT_ACCESS_SECRET: test-access-secret-minimum-32-characters
+      JWT_REFRESH_SECRET: test-refresh-secret-minimum-32-characters
+      REDIS_URL: redis://localhost:6379
+      NODE_ENV: test
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install & build
+        working-directory: backend
+        run: |
+          npm ci
+          npm run build
+
+      - name: Migrate & seed
+        working-directory: backend
+        run: |
+          npx prisma migrate deploy
+          npm run prisma:seed
+
+      - name: Unit tests
+        working-directory: backend
+        run: npm test -- --passWithNoTests --coverage --coverageReporters=text-summary
+
+      - name: E2E tests
+        working-directory: backend
+        run: npm run test:e2e
+
+  flutter:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - name: Analyze & test
+        working-directory: apps/daily_rashan
+        run: |
+          flutter pub get
+          flutter analyze lib
+          flutter test test/ --no-pub
+      - name: Integration tests (device — optional)
+        if: false
+        working-directory: apps/daily_rashan
+        run: flutter test integration_test/ --no-pub
+
+  docker:
+    runs-on: ubuntu-latest
+    needs: backend
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build API image
+        run: docker build -t daily-rashan-api:ci ./backend
