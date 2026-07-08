@@ -90,6 +90,16 @@ export class OrdersService {
       fees.sameDayFee;
 
     const order = await this.prisma.$transaction(async (tx) => {
+      await this.reserveStock(
+        tx,
+        activeItems.map((item) => ({
+          productId: item.productId,
+          variantId: item.variantId ?? undefined,
+          quantity: item.quantity,
+          productName: item.product.name,
+        })),
+      );
+
       const created = await tx.order.create({
         data: {
           orderNumber,
@@ -214,6 +224,7 @@ export class OrdersService {
   ) {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
+      include: { items: true },
     });
     if (!order) throw new NotFoundException('Order not found');
 
@@ -227,17 +238,30 @@ export class OrdersService {
       timestamps.cancelledAt = new Date();
     }
 
-    const updated = await this.prisma.order.update({
-      where: { id: orderId },
-      data: {
-        status,
-        cancelledReason,
-        ...timestamps,
-        statusLogs: {
-          create: { status, note },
+    const updated = await this.prisma.$transaction(async (tx) => {
+      if (status === OrderStatus.CANCELLED && order.status !== OrderStatus.CANCELLED) {
+        await this.restoreStock(
+          tx,
+          order.items.map((item) => ({
+            productId: item.productId,
+            variantId: item.variantId ?? undefined,
+            quantity: item.quantity,
+          })),
+        );
+      }
+
+      return tx.order.update({
+        where: { id: orderId },
+        data: {
+          status,
+          cancelledReason,
+          ...timestamps,
+          statusLogs: {
+            create: { status, note },
+          },
         },
-      },
-      include: { statusLogs: true },
+        include: { statusLogs: true },
+      });
     });
 
     await this.notificationsService.sendOrderStatusNotification(
@@ -291,5 +315,73 @@ export class OrdersService {
     ]);
 
     return paginatedResponse(data, total, page, limit);
+  }
+
+  private async reserveStock(
+    tx: Parameters<Parameters<PrismaService['$transaction']>[0]>[0],
+    items: Array<{
+      productId: string;
+      variantId?: string;
+      quantity: number;
+      productName: string;
+    }>,
+  ) {
+    for (const item of items) {
+      if (item.variantId) {
+        const reserved = await tx.productVariant.updateMany({
+          where: {
+            id: item.variantId,
+            productId: item.productId,
+            stock: { gte: item.quantity },
+          },
+          data: { stock: { decrement: item.quantity } },
+        });
+        if (reserved.count === 0) {
+          throw new BadRequestException(
+            `Insufficient stock for ${item.productName}`,
+          );
+        }
+        continue;
+      }
+
+      const reserved = await tx.product.updateMany({
+        where: {
+          id: item.productId,
+          isActive: true,
+          deletedAt: null,
+          stock: { gte: item.quantity },
+        },
+        data: { stock: { decrement: item.quantity } },
+      });
+      if (reserved.count === 0) {
+        throw new BadRequestException(
+          `Insufficient stock for ${item.productName}`,
+        );
+      }
+    }
+  }
+
+  private async restoreStock(
+    tx: Parameters<Parameters<PrismaService['$transaction']>[0]>[0],
+    items: Array<{
+      productId: string;
+      variantId?: string;
+      quantity: number;
+    }>,
+  ) {
+    for (const item of items) {
+      if (item.variantId) {
+        await tx.productVariant.update({
+          where: { id: item.variantId },
+          data: { stock: { increment: item.quantity } },
+        });
+        continue;
+      }
+
+      await tx.product.update({
+        where: { id: item.productId },
+        data: { stock: { increment: item.quantity } },
+      });
+    }
   }
 }
