@@ -1,0 +1,85 @@
+name: Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Which app to deploy
+        required: true
+        default: all
+        type: choice
+        options:
+          - all
+          - customer
+          - admin
+  push:
+    branches: [main]
+    paths:
+      - 'apps/daily_rashan/**'
+      - '.github/workflows/deploy-vercel.yml'
+      - 'scripts/build-vercel.sh'
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy-customer:
+    if: >-
+      github.event_name == 'push' ||
+      github.event.inputs.target == 'all' ||
+      github.event.inputs.target == 'customer'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Build customer web app
+        env:
+          API_BASE_URL: ${{ vars.API_BASE_URL != '' && vars.API_BASE_URL || 'https://api.dhrigro.com/api/v1' }}
+          ENV: production
+        run: ./scripts/build-vercel.sh customer
+
+      - name: Deploy to Vercel (customer)
+        uses: amondnet/vercel-action@v25
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID_CUSTOMER }}
+          working-directory: apps/daily_rashan/build/web
+          vercel-args: '--prod'
+
+  deploy-admin:
+    if: >-
+      github.event_name == 'push' ||
+      github.event.inputs.target == 'all' ||
+      github.event.inputs.target == 'admin'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Build admin web app
+        env:
+          API_BASE_URL: ${{ vars.API_BASE_URL != '' && vars.API_BASE_URL || 'https://api.dhrigro.com/api/v1' }}
+          ENV: production
+        run: ./scripts/build-vercel.sh admin
+
+      - name: Deploy to Vercel (admin)
+        uses: amondnet/vercel-action@v25
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID_ADMIN }}
+          working-directory: apps/daily_rashan/build/web
+          vercel-args: '--prod'
