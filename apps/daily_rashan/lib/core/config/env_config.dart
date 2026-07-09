@@ -19,11 +19,13 @@ class EnvConfig {
       orElse: () => AppEnvironment.development,
     );
 
-    final candidates = [
-      '.env.$envName',
-      if (kReleaseMode) '.env.production' else '.env.development',
-      '.env',
-    ];
+    // Vercel/production builds inject config via --dart-define, not asset bundles.
+    if (kReleaseMode || _env == AppEnvironment.production) {
+      dotenv.testLoad(mergeWith: _compileTimeDefaults);
+      return;
+    }
+
+    final candidates = ['.env.$envName', '.env.development', '.env'];
 
     for (final file in candidates) {
       try {
@@ -85,7 +87,9 @@ class EnvConfig {
     return configured;
   }
 
-  static String get appName => dotenv.env['APP_NAME'] ?? 'Dhrigro';
+  static String get appName =>
+      dotenv.env['APP_NAME'] ??
+      const String.fromEnvironment('APP_NAME', defaultValue: 'Dhrigro');
 
   static String get razorpayKeyId => dotenv.env['RAZORPAY_KEY_ID'] ?? '';
 
