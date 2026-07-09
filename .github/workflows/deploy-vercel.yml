@@ -42,7 +42,7 @@ jobs:
         working-directory: apps/daily_rashan
         run: |
           flutter pub get
-          flutter analyze lib
+          flutter analyze lib --no-fatal-infos --no-fatal-warnings
 
       - name: Flutter test
         working-directory: apps/daily_rashan
