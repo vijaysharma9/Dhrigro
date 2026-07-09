@@ -15,6 +15,7 @@ import '../../../../shared/widgets/admin/order_status_chip.dart';
 import '../../data/admin_repository.dart';
 import '../providers/admin_providers.dart';
 import '../widgets/admin_order_detail_sheet.dart';
+import '../utils/order_invoice_printer.dart';
 
 const _orderStatuses = [
   'PENDING',
@@ -98,6 +99,34 @@ class _AdminOrdersScreenState extends ConsumerState<AdminOrdersScreen> {
       return;
     }
     AdminToast.info(context, 'Open each order to assign partner (${ids.length} selected)');
+  }
+
+  Future<void> _printInvoice(String orderId) async {
+    try {
+      final order = await ref.read(adminRepositoryProvider).getOrder(orderId);
+      await OrderInvoicePrinter.printOrders([order]);
+      if (mounted) AdminToast.success(context, 'Invoice ready to print');
+    } catch (e) {
+      if (mounted) AdminToast.errorFrom(context, e);
+    }
+  }
+
+  Future<void> _bulkPrint() async {
+    final ids = ref.read(adminOrderSelectionProvider).toList();
+    if (ids.isEmpty) return;
+    try {
+      final repo = ref.read(adminRepositoryProvider);
+      final orders = await Future.wait(ids.map(repo.getOrder));
+      await OrderInvoicePrinter.printOrders(orders);
+      if (mounted) {
+        AdminToast.success(
+          context,
+          ids.length == 1 ? 'Invoice ready to print' : '${ids.length} invoices ready to print',
+        );
+      }
+    } catch (e) {
+      if (mounted) AdminToast.errorFrom(context, e);
+    }
   }
 
   Widget _presetChip(String label, OrderOpsFilter filter, OrderOpsFilter current) {
@@ -337,7 +366,7 @@ class _AdminOrdersScreenState extends ConsumerState<AdminOrdersScreen> {
                         AdminIconActionBtn(
                           icon: Icons.print_outlined,
                           tooltip: 'Print invoice',
-                          onPressed: () => AdminToast.info(context, 'Invoice print coming soon'),
+                          onPressed: () => _printInvoice(o['id'] as String),
                         ),
                       ],
                     ),
@@ -467,7 +496,7 @@ class _AdminOrdersScreenState extends ConsumerState<AdminOrdersScreen> {
                         label: const Text('Export', style: TextStyle(color: Colors.white)),
                       ),
                       TextButton.icon(
-                        onPressed: () => AdminToast.info(context, 'Bulk print coming soon'),
+                        onPressed: _bulkPrint,
                         icon: const Icon(Icons.print_outlined, color: Colors.white, size: 16),
                         label: const Text('Print', style: TextStyle(color: Colors.white)),
                       ),

@@ -9,6 +9,7 @@ import '../../../../shared/widgets/admin/admin_state_widgets.dart';
 import '../../../../shared/widgets/admin/admin_toast.dart';
 import '../../../../shared/widgets/admin/order_status_chip.dart';
 import '../../data/admin_repository.dart';
+import '../utils/order_invoice_printer.dart';
 
 const orderStatuses = [
   'PENDING',
@@ -287,6 +288,7 @@ class _AdminOrderDetailSheetState extends ConsumerState<AdminOrderDetailSheet> {
                 _StickyFooter(
                   saving: _saving,
                   onSave: () => _save(order),
+                  onPrint: () => _printInvoice(order),
                 ),
               ],
             );
@@ -294,6 +296,15 @@ class _AdminOrderDetailSheetState extends ConsumerState<AdminOrderDetailSheet> {
         ),
       ),
     );
+  }
+
+  Future<void> _printInvoice(Map<String, dynamic> order) async {
+    try {
+      await OrderInvoicePrinter.printOrders([order]);
+      if (mounted) AdminToast.success(context, 'Invoice ready to print');
+    } catch (e) {
+      if (mounted) AdminToast.errorFrom(context, e);
+    }
   }
 
   Future<void> _save(Map<String, dynamic> order) async {
@@ -401,10 +412,15 @@ class _TimelineTile extends StatelessWidget {
 }
 
 class _StickyFooter extends StatelessWidget {
-  const _StickyFooter({required this.saving, required this.onSave});
+  const _StickyFooter({
+    required this.saving,
+    required this.onSave,
+    required this.onPrint,
+  });
 
   final bool saving;
   final VoidCallback onSave;
+  final VoidCallback onPrint;
 
   @override
   Widget build(BuildContext context) {
@@ -419,6 +435,12 @@ class _StickyFooter extends StatelessWidget {
         top: false,
         child: Row(
           children: [
+            OutlinedButton.icon(
+              onPressed: saving ? null : onPrint,
+              icon: const Icon(Icons.print_outlined, size: 18),
+              label: const Text('Print'),
+            ),
+            const SizedBox(width: AdminSpacing.sm),
             Expanded(
               child: OutlinedButton(
                 onPressed: saving ? null : () => Navigator.pop(context),
