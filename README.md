@@ -9,8 +9,11 @@ dailyRashan/
 ├── apps/daily_rashan/     # Flutter customer app + admin entry (Riverpod, GoRouter, Dio)
 ├── backend/               # NestJS REST API + Prisma ORM
 ├── docker-compose.yml     # PostgreSQL + Redis + API
+├── render.yaml            # Render Blueprint (free API deploy)
 ├── .env.example           # Root environment template
-└── docs/DEPLOYMENT.md     # Production deployment guide
+└── docs/
+    ├── DEPLOYMENT.md          # Production deployment guide
+    └── RENDER_DEPLOYMENT.md   # Free Render + Neon setup
 ```
 
 ## Tech stack

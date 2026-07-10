@@ -5,6 +5,11 @@
 .env.staging
 .env.production
 backend/.env
+backend/.env.neon
+backend/prisma/*.js
+backend/prisma/*.js.map
+backend/prisma/*.d.ts
+backend/tsconfig.build.tsbuildinfo
 apps/daily_rashan/.env
 *.pem
 

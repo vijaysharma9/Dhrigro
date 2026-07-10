@@ -1,0 +1,42 @@
+# Render Blueprint — free NestJS API (Docker) + external Neon Postgres
+# Docs: docs/RENDER_DEPLOYMENT.md
+#
+# Deploy: Render Dashboard → New → Blueprint → connect this repo.
+# Set DATABASE_URL manually after creating a Neon database.
+
+services:
+  - type: web
+    name: dhrigro-api
+    runtime: docker
+    rootDir: backend
+    plan: free
+    region: singapore
+    healthCheckPath: /health
+    dockerCommand: sh scripts/render-start.sh
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: APP_NAME
+        value: Dhrigro
+      - key: API_PREFIX
+        value: api/v1
+      - key: REDIS_ENABLED
+        value: false
+      - key: QUEUES_ENABLED
+        value: false
+      - key: REALTIME_ENABLED
+        value: false
+      - key: SWAGGER_ENABLED
+        value: false
+      - key: METRICS_ENABLED
+        value: true
+      - key: JWT_ACCESS_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      - key: RAZORPAY_WEBHOOK_SECRET
+        generateValue: true
+      - key: DATABASE_URL
+        sync: false
+      - key: CORS_ORIGINS
+        value: https://dhrigro-customer.vercel.app,https://dhrigro-admin.vercel.app
