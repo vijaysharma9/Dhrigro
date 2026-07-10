@@ -70,6 +70,8 @@ final routerProvider = Provider<GoRouter>((ref) {
 
       if (path == '/splash') return null;
 
+      if (kIsWeb && path == '/admin') return '/login';
+
       if (!onboardingDone &&
           path != '/onboarding' &&
           !isAuth &&
@@ -85,7 +87,10 @@ final routerProvider = Provider<GoRouter>((ref) {
 
       if (isAuth && publicRoutes.contains(path) && path != '/splash') {
         if (user.isDeliveryPartner) return '/delivery';
-        if (user.isStaff) return '/admin';
+        if (user.isStaff) {
+          if (kIsWeb) return '/login';
+          return '/admin';
+        }
         if (!(prefs?.hasLocation ?? false)) return '/location-setup';
         return '/home';
       }
@@ -257,7 +262,12 @@ class _SplashScreenState extends ConsumerState<_SplashScreen> {
       if (user.isDeliveryPartner) {
         if (mounted) context.go('/delivery');
       } else if (user.isStaff) {
-        if (mounted) context.go('/admin');
+        if (kIsWeb) {
+          await ref.read(authStateProvider.notifier).logout();
+          if (mounted) context.go('/login');
+        } else if (mounted) {
+          context.go('/admin');
+        }
       } else if (!prefs.hasLocation) {
         if (mounted) context.go('/location-setup');
       } else {

@@ -90,7 +90,7 @@ jobs:
           vercel-token: ${{ secrets.VERCEL_TOKEN }}
           vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
           vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID_CUSTOMER }}
-          working-directory: apps/daily_rashan/build/web
+          working-directory: apps/daily_rashan/build/web-customer
           vercel-args: '--prod'
 
   deploy-admin:
@@ -122,7 +122,7 @@ jobs:
           vercel-token: ${{ secrets.VERCEL_TOKEN }}
           vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
           vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID_ADMIN }}
-          working-directory: apps/daily_rashan/build/web
+          working-directory: apps/daily_rashan/build/web-admin
           vercel-args: '--prod'
 
   summary:
