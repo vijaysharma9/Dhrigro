@@ -25,7 +25,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  API_BASE_URL: ${{ vars.API_BASE_URL != '' && vars.API_BASE_URL || 'https://api.dhrigro.com/api/v1' }}
+  API_BASE_URL: ${{ vars.API_BASE_URL != '' && vars.API_BASE_URL || 'https://dhrigro-api.onrender.com/api/v1' }}
 
 jobs:
   quality-gate:

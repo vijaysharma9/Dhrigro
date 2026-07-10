@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 APP_DIR="$ROOT/apps/daily_rashan"
 TARGET="${1:-customer}"
-API_BASE_URL="${API_BASE_URL:-https://api.dhrigro.com/api/v1}"
+API_BASE_URL="${API_BASE_URL:-https://dhrigro-api.onrender.com/api/v1}"
 ENV_NAME="${ENV:-production}"
 
 case "$TARGET" in
